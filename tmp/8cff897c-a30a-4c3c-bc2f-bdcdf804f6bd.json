@@ -1,0 +1,230 @@
+{
+  "id": "Sbll0c5mMSPxcrl",
+  "size": {
+    "width": 1080,
+    "height": 1920
+  },
+  "fps": 30,
+  "tracks": [
+    {
+      "id": "yJnPtlBHubTiRM4HLMaFV",
+      "accepts": [
+        "text",
+        "audio",
+        "helper",
+        "video",
+        "image",
+        "caption",
+        "template"
+      ],
+      "type": "text",
+      "items": [
+        "HXHN6umFAy5NiJFM"
+      ],
+      "magnetic": false,
+      "static": false
+    },
+    {
+      "id": "CwmTbnwWf2HEfs5cUIrhL",
+      "accepts": [
+        "text",
+        "audio",
+        "helper",
+        "video",
+        "image",
+        "caption",
+        "template"
+      ],
+      "type": "video",
+      "items": [
+        "vgPWI3f28j3FZEAW"
+      ],
+      "magnetic": false,
+      "static": false
+    }
+  ],
+  "trackItemIds": [
+    "vgPWI3f28j3FZEAW",
+    "HXHN6umFAy5NiJFM"
+  ],
+  "trackItemsMap": {
+    "vgPWI3f28j3FZEAW": {
+      "id": "vgPWI3f28j3FZEAW",
+      "metadata": {
+        "previewUrl": "https://cdn.designcombo.dev/thumbnails/Happiness-shouldnt-depend.png"
+      },
+      "trim": {
+        "from": 0,
+        "to": 23870.113
+      },
+      "type": "video",
+      "name": "video",
+      "playbackRate": 1,
+      "display": {
+        "from": 0,
+        "to": 23870.113
+      },
+      "duration": 23870.113,
+      "isMain": false,
+      "details": {
+        "width": 360,
+        "height": 640,
+        "opacity": 100,
+        "src": "https://cdn.designcombo.dev/videos/Happiness%20shouldn%E2%80%99t%20depend.mp4",
+        "volume": 100,
+        "borderRadius": 0,
+        "borderWidth": 0,
+        "borderColor": "#000000",
+        "boxShadow": {
+          "color": "#000000",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+        },
+        "top": "640px",
+        "left": "360px",
+        "transform": "scale(3)",
+        "blur": 0,
+        "brightness": 100,
+        "flipX": false,
+        "flipY": false,
+        "rotate": "0deg",
+        "visibility": "visible"
+      }
+    },
+    "HXHN6umFAy5NiJFM": {
+      "id": "HXHN6umFAy5NiJFM",
+      "name": "text",
+      "type": "text",
+      "display": {
+        "from": 0,
+        "to": 5000
+      },
+      "metadata": {},
+      "isMain": false,
+      "details": {
+        "fontFamily": "Roboto-Bold",
+        "fontSize": 120,
+        "fontWeight": "normal",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "textAlign": "center",
+        "lineHeight": "normal",
+        "letterSpacing": "normal",
+        "wordSpacing": "normal",
+        "color": "#ffffff",
+        "backgroundColor": "transparent",
+        "border": "none",
+        "textShadow": "none",
+        "text": "Heading and some body",
+        "opacity": 100,
+        "width": 600,
+        "wordWrap": "break-word",
+        "wordBreak": "normal",
+        "WebkitTextStrokeColor": "#ffffff",
+        "WebkitTextStrokeWidth": "0px",
+        "top": "744px",
+        "left": "240px",
+        "textTransform": "none",
+        "transform": "none",
+        "skewX": 0,
+        "skewY": 0,
+        "height": 432,
+        "fontUrl": "https://fonts.gstatic.com/s/roboto/v29/KFOlCnqEu92Fr1MmWUlvAx05IsDqlA.ttf",
+        "borderWidth": 0,
+        "borderColor": "#000000",
+        "boxShadow": {
+          "color": "#ffffff",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+        }
+      }
+    }
+  },
+  "transitionIds": [],
+  "transitionsMap": {},
+  "scale": {
+    "unit": 1,
+    "zoom": 1,
+    "segments": 1,
+    "index": 1
+  },
+  "duration": 23870.113,
+  "activeIds": [],
+  "trackItemDetailsMap": {
+    "vgPWI3f28j3FZEAW": {
+      "type": "video",
+      "details": {
+        "width": 360,
+        "height": 640,
+        "opacity": 100,
+        "src": "https://cdn.designcombo.dev/videos/Happiness%20shouldn%E2%80%99t%20depend.mp4",
+        "volume": 100,
+        "borderRadius": 0,
+        "borderWidth": 0,
+        "borderColor": "#000000",
+        "boxShadow": {
+          "color": "#000000",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+        },
+        "top": "640px",
+        "left": "360px",
+        "transform": "scale(3)",
+        "blur": 0,
+        "brightness": 100,
+        "flipX": false,
+        "flipY": false,
+        "rotate": "0deg",
+        "visibility": "visible"
+      },
+      "metadata": {
+        "previewUrl": "https://cdn.designcombo.dev/thumbnails/Happiness-shouldnt-depend.png"
+      }
+    },
+    "HXHN6umFAy5NiJFM": {
+      "type": "text",
+      "details": {
+        "fontFamily": "Roboto-Bold",
+        "fontSize": 120,
+        "fontWeight": "normal",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "textAlign": "center",
+        "lineHeight": "normal",
+        "letterSpacing": "normal",
+        "wordSpacing": "normal",
+        "color": "#ffffff",
+        "backgroundColor": "transparent",
+        "border": "none",
+        "textShadow": "none",
+        "text": "Heading and some body",
+        "opacity": 100,
+        "width": 600,
+        "wordWrap": "break-word",
+        "wordBreak": "normal",
+        "WebkitTextStrokeColor": "#ffffff",
+        "WebkitTextStrokeWidth": "0px",
+        "top": "744px",
+        "left": "240px",
+        "textTransform": "none",
+        "transform": "none",
+        "skewX": 0,
+        "skewY": 0,
+        "height": 432,
+        "fontUrl": "https://fonts.gstatic.com/s/roboto/v29/KFOlCnqEu92Fr1MmWUlvAx05IsDqlA.ttf",
+        "borderWidth": 0,
+        "borderColor": "#000000",
+        "boxShadow": {
+          "color": "#ffffff",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+        }
+      }
+    }
+  },
+  "structure": []
+}

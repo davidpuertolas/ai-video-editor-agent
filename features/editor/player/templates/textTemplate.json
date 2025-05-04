@@ -1,0 +1,49 @@
+{
+    "id": "LSp2fiYPScF5DdF1",
+    "name": "text",
+    "type": "text",
+    "display": {
+        "from": 0,
+        "to": 5000
+    },
+    "metadata": {},
+    "isMain": false,
+    "details": {
+        "fontFamily": "Roboto-Bold",
+        "fontSize": 120,
+        "fontWeight": "normal",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "textAlign": "center",
+        "lineHeight": "normal",
+        "letterSpacing": "normal",
+        "wordSpacing": "normal",
+        "color": "#ffffff",
+        "backgroundColor": "transparent",
+        "border": "none",
+        "textShadow": "none",
+        "text": "Heading and some body",
+        "opacity": 100,
+        "width": 600,
+        "wordWrap": "break-word",
+        "wordBreak": "normal",
+        "WebkitTextStrokeColor": "#ffffff",
+        "WebkitTextStrokeWidth": "0px",
+        "top": "744px",
+        "left": "240px",
+        "textTransform": "none",
+        "transform": "none",
+        "skewX": 0,
+        "skewY": 0,
+        "height": 432,
+        "fontUrl": "https://fonts.gstatic.com/s/roboto/v29/KFOlCnqEu92Fr1MmWUlvAx05IsDqlA.ttf",
+        "borderWidth": 0,
+        "borderColor": "#000000",
+        "boxShadow": {
+            "color": "#ffffff",
+            "x": 0,
+            "y": 0,
+            "blur": 0
+        }
+    }
+}

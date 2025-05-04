@@ -1,0 +1,36 @@
+{
+  "id": "ZnJCuo0oLI4FO31U",
+  "type": "image",
+  "name": "image",
+  "display": {
+      "from": 0,
+      "to": 5000
+  },
+  "playbackRate": 1,
+  "metadata": {},
+  "details": {
+      "src": "https://ik.imagekit.io/wombo/images/img2.jpg",
+      "width": 853,
+      "height": 1280,
+      "opacity": 100,
+      "transform": "scale(1.2661195779601406)",
+      "border": "none",
+      "borderRadius": 0,
+      "boxShadow": {
+          "color": "#000000",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+      },
+      "top": "320px",
+      "left": "113.5px",
+      "borderWidth": 0,
+      "borderColor": "#000000",
+      "blur": 0,
+      "brightness": 100,
+      "flipX": false,
+      "flipY": false,
+      "rotate": "0deg",
+      "visibility": "visible"
+  }
+}

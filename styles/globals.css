@@ -1,0 +1,401 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos base para el body para prevenir flash de contenido sin estilos */
+html, body {
+  background-color: rgb(13, 6, 19);
+  color: rgb(248, 248, 248);
+  transition: background-color 0.2s ease-out;
+}
+
+/* Animaciones para el chat */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Efectos futuristas para el chat */
+.chat-glow {
+  box-shadow: 0 0 15px 1px rgba(168, 85, 247, 0.3);
+}
+
+.chat-backdrop {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Estilos para scrollbar del chat */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: rgba(20, 10, 30, 0.5);
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.5);
+  border-radius: 10px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.7);
+}
+
+@layer base {
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
+
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+    --scene: 240 4.8% 93.9%;
+  }
+
+  .dark {
+    /* Tema Wands - Oscuro y Morado profesional */
+    --background: 260 20% 5%; /* Fondo casi negro con tinte morado */
+    --foreground: 0 0% 98%;
+    --card: 262 15% 8%; /* Tarjetas con tinte morado oscuro */
+    --card-foreground: 0 0% 98%;
+    --popover: 260 12% 6.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 265 80% 65%; /* Morado brillante para elementos principales */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 20% 12%; /* Morado oscuro para elementos secundarios */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 260 10% 15%;
+    --muted-foreground: 270 5% 80%;
+    --accent: 265 80% 65%; /* Mismo acento que el primario */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 260 15% 20%; /* Bordes más visibles con tinte morado */
+    --input: 260 15% 15%;
+    --ring: 265 80% 65%; /* Anillo del mismo color que el primario */
+    --scene: 260 15% 10%; /* Escena con el mismo tema */
+
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 10, 5, 20; /* Gradiente de fondo */
+    --background-end-rgb: 20, 10, 30;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+html {
+  font-family: "Geist variable";
+}
+
+.player-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selecto-selection {
+  background: rgba(0, 216, 214, 0.1) !important;
+  border: 1px solid rgba(0, 216, 214, 1) !important;
+}
+
+@layer utilities {
+  .masonry {
+    column-gap: 1.5em;
+    column-count: 1;
+  }
+  .masonry-sm {
+    gap: 0.5rem;
+    column-count: 2;
+  }
+}
+
+.designcombo-scene-moveable .moveable-control {
+  background: #333 !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  z-index: 10000 !important;
+  border-radius: 6px !important;
+  cursor: crosshair !important;
+
+  border: 1px solid #ffffff !important;
+  /* box-shadow: 0 0 2px 0 rgb(86, 90, 98, 0.2) !important; */
+  width: 12px !important;
+  height: 12px !important;
+  margin-top: -6px !important;
+  margin-left: -6px !important;
+}
+
+.designcombo-scene-moveable .moveable-control.moveable-n,
+.designcombo-scene-moveable .moveable-control.moveable-s {
+  width: 32px !important;
+  height: 8px !important;
+  margin-top: -4px !important;
+  margin-left: -16px !important;
+  border-radius: 8px !important;
+  z-index: 9999 !important;
+  cursor: crosshair !important;
+}
+
+.designcombo-scene-moveable .moveable-control.moveable-e,
+.designcombo-scene-moveable .moveable-control.moveable-w {
+  width: 8px !important;
+  height: 32px !important;
+  margin-left: -4px !important;
+  margin-top: -16px !important;
+  border-radius: 8px !important;
+  z-index: 10 !important;
+  cursor: crosshair !important;
+}
+
+.designcombo-scene-moveable .moveable-rotation-control {
+  border: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg%20width%3D%2724%27%20height%3D%2724%27%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20fill%3D%27%23757575%27%3E%3Cg%20fill%3D%27none%27%20fill-rule%3D%27evenodd%27%3E%3Ccircle%20stroke%3D%27%23CCD1DA%27%20fill%3D%27%23FFF%27%20cx%3D%2712%27%20cy%3D%2712%27%20r%3D%2711.5%27%2F%3E%3Cpath%20d%3D%27M16.242%2012.012a4.25%204.25%200%2000-5.944-4.158L9.696%206.48a5.75%205.75%200%20018.048%205.532h1.263l-2.01%203.002-2.008-3.002h1.253zm-8.484-.004a4.25%204.25%200%20005.943%203.638l.6%201.375a5.75%205.75%200%2001-8.046-5.013H5.023L7.02%209.004l1.997%203.004h-1.26z%27%20fill%3D%27%23000%27%20fill-rule%3D%27nonzero%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") !important;
+  width: 24px !important;
+  height: 24px !important;
+  background-size: 100% 100% !important;
+  display: block !important;
+  margin-left: -11px !important;
+  background-color: transparent !important;
+  cursor: pointer !important;
+}
+
+.designcombo-scene-moveable .moveable-rotation .moveable-rotation-line {
+  display: none !important;
+}
+
+.moveable-line {
+  pointer-events: none !important;
+  height: 1px !important;
+  background: #fff !important;
+}
+
+/* CSS */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ScrollAreaRootH {
+  border-radius: 4px;
+  overflow: hidden;
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  background: transparent;
+}
+
+.ScrollAreaRootV {
+  border-radius: 4px;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  right: 4px;
+  background: transparent;
+}
+
+.ScrollAreaViewport {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  opacity: 0;
+}
+
+.ScrollAreaScrollbar {
+  display: flex;
+  /* ensures no selection */
+  user-select: none;
+  /* disable browser handling of all panning and zooming gestures on touch devices */
+  touch-action: none;
+  padding: 2px;
+  background: transparent;
+  transition: background 160ms ease-out;
+}
+
+.ScrollAreaScrollbar:hover {
+  background: var(--zinc-800);
+}
+.ScrollAreaScrollbar[data-orientation="vertical"] {
+  width: 10px;
+}
+.ScrollAreaScrollbar[data-orientation="horizontal"] {
+  flex-direction: column;
+  height: 10px;
+}
+
+.ScrollAreaThumb {
+  flex: 1;
+  background: var(--zinc-700);
+  border-radius: 10px;
+  position: relative;
+}
+/* increase target size for touch devices https://www.w3.org/WAI/WCAG21/Understanding/target-size.html */
+.ScrollAreaThumb::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* CROP STYLES */
+
+.crop {
+  position: relative;
+  font-size: 0;
+}
+
+.options {
+  margin-bottom: 0.25rem;
+}
+
+.videoPreview {
+  /* box-shadow: 0 0 20px 5px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  width: 100%; */
+}
+
+.box svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.box svg line {
+  stroke: rgb(0, 216, 214);
+  stroke-width: 1;
+}
+
+.dimensions {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.handles > div {
+  position: absolute;
+  background: #fff;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgb(0, 216, 214);
+}
+
+.handle-nw,
+.handle-se,
+.handle-ne,
+.handle-sw {
+  cursor: crosshair;
+}
+
+.handle-n {
+  top: 0;
+  left: 50%;
+}
+
+.handle-nw,
+.handle-ne,
+.handle-sw,
+.handle-se {
+  z-index: 10;
+}
+
+.handle-nw {
+  top: 0;
+  left: 0;
+}
+
+.handle-ne,
+.handle-se {
+  cursor: crosshair;
+}
+
+.handle-ne {
+  top: 0;
+  left: 100%;
+}
+
+.handle-se {
+  top: 100%;
+  left: 100%;
+}
+
+.handle-e {
+  top: 50%;
+  right: 0;
+  left: auto;
+  cursor: ew-resize;
+}
+
+.handle-sw,
+.handle-s {
+  top: 100%;
+}
+
+.handle-sw {
+  left: 0;
+}
+
+.handle-n,
+.handle-s {
+  cursor: ns-resize;
+}
+
+.handle-s {
+  left: 50%;
+}
+
+.handle-e,
+.handle-w {
+  cursor: ew-resize;
+}
+
+.handle-w {
+  left: 0;
+  top: 50%;
+}

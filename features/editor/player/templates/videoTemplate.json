@@ -1,0 +1,45 @@
+{
+  "id": "IuPRiUu5NacJpbM",
+  "metadata": {
+      "previewUrl": "blob:http://localhost:3000/97b9bd79-e84a-40f0-a3a5-be314b4905f7",
+      "fileName": "video_exportado.mov"
+  },
+  "trim": {
+      "from": 0,
+      "to": 133100
+  },
+  "type": "video",
+  "name": "video",
+  "playbackRate": 1,
+  "display": {
+      "from": 0,
+      "to": 133100
+  },
+  "duration": 133100,
+  "isMain": false,
+  "details": {
+      "width": 852,
+      "height": 480,
+      "opacity": 100,
+      "src": "blob:http://localhost:3000/97b9bd79-e84a-40f0-a3a5-be314b4905f7",
+      "volume": 100,
+      "borderRadius": 0,
+      "borderWidth": 0,
+      "borderColor": "#000000",
+      "boxShadow": {
+          "color": "#000000",
+          "x": 0,
+          "y": 0,
+          "blur": 0
+      },
+      "top": "720px",
+      "left": "114px",
+      "transform": "scale(1.267605633802817)",
+      "blur": 0,
+      "brightness": 100,
+      "flipX": false,
+      "flipY": false,
+      "rotate": "0deg",
+      "visibility": "visible"
+  }
+}

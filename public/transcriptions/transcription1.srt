@@ -1,0 +1,25 @@
+1
+00:00:00,782 --> 00:00:07,000
+Bienvenidos a todos, esto es un vídeo demo y
+voy a demostrar las capacidades de esta herramienta llamada captions.ai
+
+2
+00:00:8,000 --> 00:00:18,200
+En primer lugar quiero mostraros la forma
+en la que con un simple fragmento de vídeo
+
+3
+00:00:22,630 --> 00:00:29,446
+¿Veis como arrastramos el vídeo al editor? Le
+damos a continuar y google.com
+
+4
+00:00:34,138 --> 00:00:40,000
+Automáticamente edita el vídeo, la Inteligencia
+Artificial y tenemos el vídeo perfecto para ser publicado.
+
+5
+00:00:44,482 --> 00:00:48,500
+Comenta IA y te envío la web completamente
+gratis.
+
