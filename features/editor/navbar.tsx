@@ -74,8 +74,10 @@ export default function Navbar({
       style={{
         display: "grid",
         gridTemplateColumns: "320px 1fr 320px",
+        background: "linear-gradient(to bottom, rgba(18, 10, 25, 0.95), rgba(14, 8, 20, 0.95))",
+        borderBottom: "1px solid rgba(70, 50, 120, 0.2)",
       }}
-      className="bg-sidebar pointer-events-none flex h-[58px] items-center border-b border-border/80 px-2 shadow-md"
+      className="pointer-events-none flex h-[58px] items-center px-2 shadow-md"
     >
       <DownloadProgressModal />
 
@@ -114,7 +116,7 @@ export default function Navbar({
       </div>
 
       <div className="flex h-14 items-center justify-center gap-2">
-        <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5 text-muted-foreground">
+        <div className="pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5 text-muted-foreground" style={{ background: "rgba(35, 20, 65, 0)" }}>
           <AutosizeInput
             name="title"
             value={title}
@@ -137,7 +139,7 @@ export default function Navbar({
               <MessageSquare width={20} />
             </Button>
           )}
-      <div className="bg-sidebar pointer-events-auto flex h-12 items-center px-1.5">
+      <div className="pointer-events-auto flex h-12 items-center px-1.5" style={{ background: "rgba(35, 20, 65, 0)", borderRadius: "0.375rem" }}>
           <Button
             onClick={handleUndo}
             className="text-muted-foreground hover:text-purple-400 hover:bg-[#2a1f35]"
@@ -156,7 +158,7 @@ export default function Navbar({
           </Button>
 
         </div>
-        <div className="bg-sidebar pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5">
+        <div className="pointer-events-auto flex h-12 items-center gap-2 rounded-md px-2.5" style={{ background: "rgba(35, 20, 65, 0)" }}>
           <Button
             className="flex h-8 gap-1 border border-border hover:bg-[#2a1f35] hover:border-purple-700/50"
             variant="outline"

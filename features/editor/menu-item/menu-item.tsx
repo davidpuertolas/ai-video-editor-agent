@@ -62,7 +62,14 @@ export const MenuItem = () => {
   }, []);
 
   return (
-    <div className="w-[300px] flex-1">
+    <div
+      className="w-[300px] flex-1"
+      style={{
+        background: "linear-gradient(to right, rgba(18, 10, 28, 0.98), rgba(14, 8, 20, 0.98))",
+        borderRight: "1px solid rgba(90, 60, 150, 0.1)",
+        boxShadow: "inset 0 0 20px rgba(0, 0, 0, 0.2)"
+      }}
+    >
       <ActiveMenuItem />
     </div>
   );

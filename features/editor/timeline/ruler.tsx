@@ -25,11 +25,11 @@ interface RulerProps {
 
 const Ruler = (props: RulerProps) => {
   const {
-    height = 40, // Increased height to give space for the text
-    longLineSize = 8,
-    shortLineSize = 10,
+    height = 42, // Incrementado ligeramente para más espacio
+    longLineSize = 10,
+    shortLineSize = 6,
     offsetX = TIMELINE_OFFSET_X + TIMELINE_OFFSET_CANVAS_LEFT,
-    textOffsetY = 17, // Place the text above the lines but inside the canvas
+    textOffsetY = 17, // Posición del texto sobre las líneas
     textFormat = formatTimelineUnit,
     scrollLeft: scrollPos = 0,
     onClick,
@@ -40,7 +40,7 @@ const Ruler = (props: RulerProps) => {
     useState<CanvasRenderingContext2D | null>(null);
   const [canvasSize, setCanvasSize] = useState({
     width: 0,
-    height: height, // Increased height for text space
+    height: height,
   });
 
   useEffect(() => {
@@ -100,11 +100,27 @@ const Ruler = (props: RulerProps) => {
     const segments = scale.segments;
     context.clearRect(0, 0, width, height);
     context.save();
-    context.strokeStyle = "#71717a";
-    context.fillStyle = "#71717a";
+
+    // Dibujar un fondo con gradiente para la regla
+    const gradient = context.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, "rgba(45, 25, 75, 0.9)"); // Púrpura oscuro en la parte superior
+    gradient.addColorStop(1, "rgba(30, 15, 50, 0.9)"); // Más oscuro en la parte inferior
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, width, height);
+
+    // Dibujar una línea de borde brillante en la parte inferior
+    context.beginPath();
+    context.moveTo(0, height - 0.5);
+    context.lineTo(width, height - 0.5);
+    context.strokeStyle = "rgba(156, 90, 250, 0.6)"; // Púrpura brillante
     context.lineWidth = 1;
+    context.stroke();
+
+    // Configurar estilos de texto
+    context.fillStyle = "#b388ff"; // Púrpura claro para el texto
     context.font = `${SMALL_FONT_SIZE}px ${SECONDARY_FONT}`;
     context.textBaseline = "top";
+    context.textAlign = "center"; // Centrar el texto
 
     context.translate(0.5, 0);
     context.beginPath();
@@ -114,7 +130,15 @@ const Ruler = (props: RulerProps) => {
     const maxRange = Math.ceil((scrollPos + width) / zoomUnit);
     const length = maxRange - minRange;
 
-    // Draw text before drawing the lines
+    // Crear un brillo de fondo para las marcas principales
+    const createHighlight = (x: number, radius: number = 10, alpha: number = 0.1) => {
+      const glow = context.createRadialGradient(x, height, 0, x, height, radius);
+      glow.addColorStop(0, `rgba(156, 90, 250, ${alpha})`);
+      glow.addColorStop(1, "rgba(156, 90, 250, 0)");
+      return glow;
+    };
+
+    // Dibujar texto antes de dibujar las líneas
     for (let i = 0; i <= length; ++i) {
       const value = i + minRange;
 
@@ -124,17 +148,19 @@ const Ruler = (props: RulerProps) => {
       const startPos = (startValue - scrollPos / zoom) * zoom;
 
       if (startPos < -zoomUnit || startPos >= width + zoomUnit) continue;
+
       const text = textFormat(startValue);
+      const posX = startPos + offsetX;
 
-      // Calculate the textOffsetX value
-      const textWidth = context.measureText(text).width;
-      const textOffsetX = -textWidth / 2;
-
-      // Adjust textOffsetY so it stays inside the canvas but above the lines
-      context.fillText(text, startPos + textOffsetX + offsetX, textOffsetY);
+      // Dibujar texto con sombra para efecto futurista
+      context.save();
+      context.shadowColor = 'rgba(156, 90, 250, 0.3)';
+      context.shadowBlur = 3;
+      context.fillText(text, posX, textOffsetY);
+      context.restore();
     }
 
-    // Draw long and short lines after the text
+    // Dibujar líneas largas y cortas después del texto
     for (let i = 0; i <= length; ++i) {
       const value = i + minRange;
 
@@ -143,6 +169,12 @@ const Ruler = (props: RulerProps) => {
       const startValue = value * zoomUnit;
       const startPos = startValue - scrollPos + offsetX;
 
+      // Dibujar un brillo de fondo para cada marca principal
+      if (value % 2 === 0) {
+        context.fillStyle = createHighlight(startPos, 12, 0.15);
+        context.fillRect(startPos - 12, height - 18, 24, 18);
+      }
+
       for (let j = 0; j < segments; ++j) {
         const pos = startPos + (j / segments) * zoomUnit;
 
@@ -150,26 +182,23 @@ const Ruler = (props: RulerProps) => {
 
         const lineSize = j % segments ? shortLineSize : longLineSize;
 
-        // Set color based on line size
+        // Establecer color basado en el tamaño de la línea
         if (lineSize === shortLineSize) {
-          context.strokeStyle = "#52525b"; // Yellow for short lines
+          context.strokeStyle = "rgba(156, 90, 250, 0.3)"; // Púrpura claro para líneas cortas
         } else {
-          context.strokeStyle = "#18181b"; // Red for long lines
+          context.strokeStyle = "rgba(156, 90, 250, 0.7)"; // Púrpura más brillante para líneas largas
         }
 
-        const origin = 18; // Increase the origin to start lines lower, below the text
+        const origin = 24; // Aumentar el origen para empezar las líneas más abajo, debajo del texto
 
         const [x1, y1] = [pos, origin];
         const [x2, y2] = [x1, y1 + lineSize];
 
-        context.beginPath(); // Begin a new path for each line
+        context.beginPath(); // Comenzar un nuevo camino para cada línea
+        context.lineWidth = lineSize === shortLineSize ? 1 : 1.5; // Líneas más gruesas para marcas principales
         context.moveTo(x1, y1);
         context.lineTo(x2, y2);
-
-        // Set color based on line size
-        if (lineSize === shortLineSize) {
-          context.stroke(); // Draw the line
-        }
+        context.stroke(); // Dibujar la línea
       }
     }
 
@@ -180,31 +209,32 @@ const Ruler = (props: RulerProps) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Get the bounding box of the canvas to calculate the relative click position
+    // Obtener el cuadro delimitador del canvas para calcular la posición relativa del clic
     const rect = canvas.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
 
-    // Calculate total x position, including scrollPos
+    // Calcular la posición x total, incluido scrollPos
     const totalX =
       clickX + scrollPos - TIMELINE_OFFSET_X - TIMELINE_OFFSET_CANVAS_LEFT;
 
     onClick?.(totalX);
-    // Here you can handle the result as needed
   };
 
   return (
     <div
-      className="border-t border-border"
+      className="border-t border-purple-800/30"
       style={{
         position: "relative",
         width: "100%",
         height: `${canvasSize.height}px`,
+        boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
       }}
     >
       <canvas
         onMouseUp={handleClick}
         ref={canvasRef}
         height={canvasSize.height}
+        className="cursor-pointer"
       />
     </div>
   );

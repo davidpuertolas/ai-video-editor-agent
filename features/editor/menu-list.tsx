@@ -16,7 +16,13 @@ export default function MenuList() {
   }, [activeMenuItem, showMenuItem]);
 
   return (
-    <div className="flex w-14 flex-col items-center gap-1 border-r border-border/80 py-2">
+    <div
+      className="flex w-14 flex-col items-center gap-1 border-r py-2"
+      style={{
+        background: "linear-gradient(to right, rgba(20, 10, 30, 0.95), rgba(16, 8, 22, 0.95))",
+        borderRight: "1px solid rgba(90, 60, 150, 0.15)"
+      }}
+    >
       {/* Editor de Atributos */}
       <Button
         onClick={() => {
@@ -26,8 +32,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "attributes"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -36,21 +42,7 @@ export default function MenuList() {
         <Sliders width={16} />
       </Button>
 
-      <Button
-        onClick={() => {
-          setActiveMenuItem("texts");
-          setShowMenuItem(true);
-        }}
-        className={cn(
-          showMenuItem && activeMenuItem === "texts"
-            ? "bg-secondary"
-            : "text-muted-foreground",
-        )}
-        variant={"ghost"}
-        size={"icon"}
-      >
-        <Icons.type width={16} />
-      </Button>
+
 
       <Button
         onClick={() => {
@@ -59,8 +51,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "videos"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -75,14 +67,32 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "images"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
       >
         <Icons.image width={16} />
       </Button>
+
+      <Button
+        onClick={() => {
+          setActiveMenuItem("texts");
+          setShowMenuItem(true);
+        }}
+        className={cn(
+          showMenuItem && activeMenuItem === "texts"
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
+        )}
+        variant={"ghost"}
+        size={"icon"}
+      >
+        <Icons.type width={16} />
+      </Button>
+
+
       {/* <Button
         onClick={() => {
           setActiveMenuItem("shapes");
@@ -90,8 +100,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "shapes"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -105,8 +115,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "audios"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -122,8 +132,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "subtitles"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -139,8 +149,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "advanced"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}
@@ -157,8 +167,8 @@ export default function MenuList() {
         }}
         className={cn(
           showMenuItem && activeMenuItem === "smarttrim"
-            ? "bg-secondary"
-            : "text-muted-foreground",
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
         )}
         variant={"ghost"}
         size={"icon"}

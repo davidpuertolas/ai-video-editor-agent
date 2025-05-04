@@ -32,6 +32,78 @@ CanvasTimeline.registerItems({
   PreviewTrackItem,
 });
 
+// Estilos para el contenedor de la timeline
+const timelineStyles = {
+  container: {
+    position: "relative" as const,
+    height: "100%" as const,
+    width: "100%" as const,
+    overflow: "hidden" as const,
+    background: "linear-gradient(180deg, rgba(18, 10, 28, 0.98) 0%, rgba(12, 7, 20, 0.98) 100%)",
+    borderTop: "1px solid rgba(70, 50, 120, 0.2)",
+    boxShadow: "inset 0 0 30px rgba(0, 0, 0, 0.4)",
+  },
+  trackArea: {
+    display: "flex" as const,
+  },
+  trackLabels: {
+    position: "relative" as const,
+    width: "40px" as const,
+    flexGrow: 0,
+    flexShrink: 0,
+    background: "linear-gradient(90deg, rgba(25, 15, 40, 0.8) 0%, rgba(18, 10, 32, 0.8) 100%)",
+    borderRight: "1px solid rgba(70, 50, 120, 0.2)",
+    boxShadow: "2px 0 4px rgba(0, 0, 0, 0.2)",
+  },
+  canvasContainer: {
+    position: "relative" as const,
+    height: "100%" as const,
+    flexGrow: 1,
+  },
+  canvas: {
+    position: "absolute" as const,
+    top: 0,
+    width: "100%" as const,
+  },
+  scrollbarH: {
+    position: "absolute" as const,
+    width: "calc(100vw - 40px)" as const,
+    height: "10px" as const,
+    bottom: "10px",
+    left: 0,
+    zIndex: 10,
+  },
+  scrollbarV: {
+    position: "absolute" as const,
+    height: "100%" as const,
+    width: "10px" as const,
+    right: "6px",
+    top: 0,
+    zIndex: 10,
+  },
+  scrollThumb: {
+    backgroundColor: "rgba(90, 60, 150, 0.4)",
+    borderRadius: "10px",
+    cursor: "pointer" as const,
+    transition: "background-color 0.2s ease",
+  },
+  scrollThumbHover: {
+    backgroundColor: "rgba(90, 60, 150, 0.6)",
+  },
+  gridPattern: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.03,
+    pointerEvents: "none" as const,
+    backgroundImage: "linear-gradient(0deg, rgba(90, 60, 150, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(90, 60, 150, 0.2) 1px, transparent 1px)",
+    backgroundSize: "20px 20px",
+    zIndex: 1,
+  },
+};
+
 const EMPTY_SIZE = { width: 0, height: 0 };
 const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
   // prevent duplicate scroll events
@@ -49,6 +121,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
   const [size, setSize] = useState<{ width: number; height: number }>(
     EMPTY_SIZE,
   );
+  const [hoveredScrollbar, setHoveredScrollbar] = useState<'h' | 'v' | null>(null);
 
   const { setTimeline } = useStore();
   const onScroll = (v: { scrollTop: number; scrollLeft: number }) => {
@@ -113,8 +186,8 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
         width: containerWidth,
         height: 0,
       },
-      selectionColor: "rgba(0, 216, 214,0.1)",
-      selectionBorderColor: "rgba(0, 216, 214,1.0)",
+      selectionColor: "rgba(156, 90, 250, 0.2)",
+      selectionBorderColor: "rgba(156, 90, 250, 1.0)",
       onScroll,
       onResizeCanvas,
       scale: scale,
@@ -142,7 +215,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
         customTrack2: ["video", "image"],
         main: ["video", "image"],
       },
-      guideLineColor: "#ffffff",
+      guideLineColor: "rgba(156, 90, 250, 0.8)",
     });
 
     canvasRef.current = canvas;
@@ -251,60 +324,57 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
   }, []);
 
   const handleReplaceItem = (trackItem: Partial<ITrackItem>) => {
+    const id = trackItem.id!;
     dispatch(REPLACE_MEDIA, {
       payload: {
-        [trackItem.id!]: {
-          details: {
-            src: "https://cdn.designcombo.dev/videos/demo-video-4.mp4",
-          },
-        },
+        id,
+        mediaSource: trackItem.details?.src!,
       },
     });
   };
 
   const onClickRuler = (units: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+    if (!playerRef?.current) return;
     const time = unitsToTimeMs(units, scale.zoom);
-    playerRef?.current?.seekTo((time * fps) / 1000);
+    const frame = (time * fps) / 1000;
+    playerRef?.current.seekTo(frame);
   };
-
-  useEffect(() => {
-    const availableScroll = horizontalScrollbarVpRef.current?.scrollWidth;
-    if (!availableScroll || !timeline) return;
-    const canvasWidth = timeline.width;
-    if (availableScroll < canvasWidth + scrollLeft) {
-      timeline.scrollTo({ scrollLeft: availableScroll - canvasWidth });
-    }
-  }, [scale]);
 
   return (
     <div
       ref={timelineContainerRef}
       id={"timeline-container"}
-      className="relative h-full w-full overflow-hidden bg-sidebar"
+      style={timelineStyles.container}
     >
       <Header />
       <Ruler onClick={onClickRuler} scrollLeft={scrollLeft} />
       <Playhead scrollLeft={scrollLeft} />
-      <div className="flex">
-        <div className="relative w-10 flex-none"></div>
-        <div style={{ height: canvasSize.height }} className="relative flex-1">
+
+      {/* Grid pattern overlay */}
+      <div style={timelineStyles.gridPattern}></div>
+
+      <div style={timelineStyles.trackArea}>
+        <div style={timelineStyles.trackLabels}></div>
+        <div style={{ ...timelineStyles.canvasContainer, height: canvasSize.height }}>
           <div
-            style={{ height: canvasSize.height }}
+            style={{ ...timelineStyles.canvas, height: canvasSize.height }}
             ref={containerRef}
-            className="absolute top-0 w-full"
           >
-            <canvas id="designcombo-timeline-canvas" ref={canvasElRef} />
+            <canvas
+              id="designcombo-timeline-canvas"
+              ref={canvasElRef}
+              style={{
+                background: "rgba(15, 8, 22, 0.2)",
+                boxShadow: "inset 0 0 20px rgba(0, 0, 0, 0.3)",
+                borderRadius: "2px",
+              }}
+            />
           </div>
+
+          {/* Scrollbars con estilo mejorado */}
           <ScrollArea.Root
             type="always"
-            style={{
-              position: "absolute",
-              width: "calc(100vw - 40px)",
-              height: "10px",
-            }}
+            style={timelineStyles.scrollbarH}
             className="ScrollAreaRootH"
             onPointerDown={() => {
               canScrollRef.current = true;
@@ -312,6 +382,8 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
             onPointerUp={() => {
               canScrollRef.current = false;
             }}
+            onMouseEnter={() => setHoveredScrollbar('h')}
+            onMouseLeave={() => setHoveredScrollbar(null)}
           >
             <ScrollArea.Viewport
               onScroll={handleOnScrollH}
@@ -333,6 +405,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
             <ScrollArea.Scrollbar
               className="ScrollAreaScrollbar"
               orientation="horizontal"
+              style={{
+                background: hoveredScrollbar === 'h' ? "rgba(35, 20, 60, 0.3)" : "transparent",
+                transition: "background 0.2s ease",
+              }}
             >
               <ScrollArea.Thumb
                 onMouseDown={() => {
@@ -341,6 +417,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
                 onMouseUp={() => {
                   canScrollRef.current = false;
                 }}
+                style={hoveredScrollbar === 'h' ? { ...timelineStyles.scrollThumb, ...timelineStyles.scrollThumbHover } : timelineStyles.scrollThumb}
                 className="ScrollAreaThumb"
               />
             </ScrollArea.Scrollbar>
@@ -348,12 +425,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 
           <ScrollArea.Root
             type="always"
-            style={{
-              position: "absolute",
-              height: canvasSize.height,
-              width: "10px",
-            }}
+            style={timelineStyles.scrollbarV}
             className="ScrollAreaRootV"
+            onMouseEnter={() => setHoveredScrollbar('v')}
+            onMouseLeave={() => setHoveredScrollbar(null)}
           >
             <ScrollArea.Viewport
               onScroll={handleOnScrollV}
@@ -373,6 +448,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
             <ScrollArea.Scrollbar
               className="ScrollAreaScrollbar"
               orientation="vertical"
+              style={{
+                background: hoveredScrollbar === 'v' ? "rgba(35, 20, 60, 0.3)" : "transparent",
+                transition: "background 0.2s ease",
+              }}
             >
               <ScrollArea.Thumb
                 onMouseDown={() => {
@@ -381,12 +460,29 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
                 onMouseUp={() => {
                   canScrollRef.current = false;
                 }}
+                style={hoveredScrollbar === 'v' ? { ...timelineStyles.scrollThumb, ...timelineStyles.scrollThumbHover } : timelineStyles.scrollThumb}
                 className="ScrollAreaThumb"
               />
             </ScrollArea.Scrollbar>
           </ScrollArea.Root>
+
+          {/* Glass overlay effect para los bordes del área de timeline */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              pointerEvents: "none",
+              boxShadow: "inset 0 0 0 1px rgba(70, 50, 120, 0.2)",
+              borderRadius: "2px",
+              zIndex: 5,
+            }}
+          ></div>
         </div>
       </div>
+
     </div>
   );
 };

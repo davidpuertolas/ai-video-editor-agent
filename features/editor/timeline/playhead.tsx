@@ -90,16 +90,94 @@ const Playhead = ({ scrollLeft }: { scrollLeft: number }) => {
         touchAction: "none", // Prevent default touch actions
       }}
     >
+      {/* Playhead marker at the top */}
       <div
         style={{
-          borderRadius: "0 0 4px 4px",
+          position: "absolute",
+          top: -2,
+          left: -6,
+          width: 12,
+          height: 12,
+          borderRadius: "50% 50% 0 0",
+          background: "linear-gradient(135deg, #b388ff 0%, #8c5bd8 100%)",
+          boxShadow: "0 0 8px rgba(179, 136, 255, 0.8)",
+          border: "1px solid rgba(255, 255, 255, 0.6)",
+          transform: "translateY(-50%)",
+          transition: "box-shadow 0.2s ease-in-out",
         }}
-        className="absolute top-0 h-4 w-2 -translate-x-1/2 transform bg-white text-xs font-semibold text-zinc-800"
+        className="hover:shadow-[0_0_12px_rgba(179,136,255,1)]"
       ></div>
+
+      {/* Playhead line with glow effect */}
       <div className="relative h-full">
-        <div className="absolute top-0 h-full w-3 -translate-x-1/2 transform"></div>
-        <div className="absolute top-0 h-full w-0.5 -translate-x-1/2 transform bg-white/50"></div>
+        {/* Glow effect */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "3px",
+            height: "100%",
+            background: "rgba(179, 136, 255, 0.15)",
+            filter: "blur(2px)",
+            transform: "translateX(-50%)",
+          }}
+        ></div>
+
+        {/* Bright line */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "1px",
+            height: "100%",
+            background: "#b388ff",
+            transform: "translateX(-50%)",
+            boxShadow: "0 0 3px rgba(179, 136, 255, 0.8)",
+          }}
+        ></div>
+
+        {/* Animated pulse effect */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "1px",
+            height: "100%",
+            background: "rgba(179, 136, 255, 0.5)",
+            transform: "translateX(-50%)",
+            animation: "playheadPulse 2s infinite ease-in-out",
+          }}
+        ></div>
       </div>
+
+      {/* Small marker dots along the playhead */}
+      {[0.2, 0.4, 0.6, 0.8].map((pos) => (
+        <div
+          key={pos}
+          style={{
+            position: "absolute",
+            top: `${pos * 100}%`,
+            left: 0,
+            width: "3px",
+            height: "3px",
+            borderRadius: "50%",
+            background: "rgba(179, 136, 255, 0.6)",
+            transform: "translate(-50%, -50%)",
+          }}
+        ></div>
+      ))}
+
+      {/* CSS for playhead animations */}
+      <style jsx>{`
+        @keyframes playheadPulse {
+          0% { opacity: 0.3; height: 30%; top: 0; }
+          50% { opacity: 0.8; height: 70%; top: 15%; }
+          100% { opacity: 0.3; height: 30%; top: 0; }
+        }
+      `}</style>
     </div>
   );
 };

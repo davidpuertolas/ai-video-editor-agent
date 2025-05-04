@@ -79,6 +79,17 @@ const IconPlayerSkipForward = ({ size }: { size: number }) => (
     <path d="M20 5l0 14" />
   </svg>
 );
+
+// Estilo solo para el contenedor del header, manteniendo el aspecto visual mejorado pero más oscuro
+const headerContainerStyle = {
+  position: "relative" as const,
+  height: "50px",
+  flex: "none" as const,
+  background: "linear-gradient(180deg, rgba(28, 18, 42, 0.95) 0%, rgba(22, 12, 32, 0.95) 100%)",
+  borderBottom: "1px solid rgba(90, 60, 150, 0.3)",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+};
+
 const Header = () => {
   const [playing, setPlaying] = useState(false);
   const { duration, fps, scale, playerRef, activeIds } = useStore();
@@ -135,13 +146,7 @@ const Header = () => {
   }, [playerRef]);
 
   return (
-    <div
-      style={{
-        position: "relative",
-        height: "50px",
-        flex: "none",
-      }}
-    >
+    <div style={headerContainerStyle}>
       <div
         style={{
           position: "absolute",
