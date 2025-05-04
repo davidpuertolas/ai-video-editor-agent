@@ -5,18 +5,21 @@ import { dispatch } from "@designcombo/events";
 import { ADD_VIDEO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 import { IVideo } from "@designcombo/types";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useIsDraggingOverTimeline } from "../hooks/is-dragging-over-timeline";
 import { Button } from "@/components/ui/button";
 import { UploadIcon } from "lucide-react";
 
 export const Videos = () => {
   const isDraggingOverTimeline = useIsDraggingOverTimeline();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
 
   const handleAddVideo = (payload: Partial<IVideo>) => {
-    // payload.details.src = "https://cdn.designcombo.dev/videos/timer-20s.mp4";
+    console.log("[DEBUG Videos] Añadiendo video:", payload.details?.src?.substring(0, 30) + "...");
+    console.log("[DEBUG Videos] Thumbnail disponible:", !!payload.metadata?.previewUrl);
+    console.log("[DEBUG Videos] Nombre del archivo:", payload.metadata?.fileName || "No disponible");
+
     dispatch(ADD_VIDEO, {
       payload,
       options: {
@@ -26,21 +29,25 @@ export const Videos = () => {
     });
   };
 
-  // Función para generar un thumbnail a partir de un video
+  // Función para generar una miniatura a partir de un video
   const generateVideoThumbnail = (file: File): Promise<string> => {
+    console.log("[DEBUG Videos] Generando thumbnail para video:", file.name);
+
     return new Promise((resolve, reject) => {
-      // Crear un elemento de video temporal para generar la miniatura
+      // Crear un elemento de video temporal
       const video = document.createElement('video');
       video.preload = 'metadata';
 
       // Configurar eventos
       video.onloadedmetadata = () => {
+        console.log("[DEBUG Videos] Video metadata cargada, duración:", video.duration);
         // Buscar un fotograma cerca del inicio del video, pero no el primer frame
         video.currentTime = Math.min(1, video.duration / 10);
       };
 
       video.onloadeddata = () => {
         try {
+          console.log("[DEBUG Videos] Datos de video cargados, generando thumbnail");
           // Crear un canvas para capturar el fotograma actual
           const canvas = document.createElement('canvas');
           canvas.width = video.videoWidth;
@@ -52,75 +59,91 @@ export const Videos = () => {
 
           // Convertir el canvas a una URL de datos (thumbnail)
           const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          console.log("[DEBUG Videos] Thumbnail generado correctamente:", dataUrl.substring(0, 50) + "...");
 
           // Liberar recursos
           URL.revokeObjectURL(video.src);
 
           resolve(dataUrl);
         } catch (error) {
-          console.error("Error generando thumbnail:", error);
+          console.error("[ERROR Videos] Error generando thumbnail:", error);
           reject(error);
         }
       };
 
-      video.onerror = () => {
-        console.error("Error cargando video para thumbnail");
+      video.onerror = (error) => {
+        console.error("[ERROR Videos] Error cargando video para thumbnail:", error);
         URL.revokeObjectURL(video.src);
         reject(new Error("Error loading video"));
       };
 
       // Establecer la fuente del video
-      video.src = URL.createObjectURL(file);
+      const videoUrl = URL.createObjectURL(file);
+      video.src = videoUrl;
+      console.log("[DEBUG Videos] URL del video creado:", videoUrl);
     });
   };
 
+  // Manejar subida de archivo local
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      console.log("[DEBUG Videos] No se seleccionaron archivos");
+      return;
+    }
 
     try {
       setIsGeneratingThumbnail(true);
+      const file = files[0];
+      console.log("[DEBUG Videos] Archivo seleccionado:", file.name, "Tipo:", file.type);
+
+      if (!file.type.startsWith('video/')) {
+        console.error("[ERROR Videos] El archivo no es un video válido");
+        setIsGeneratingThumbnail(false);
+        return;
+      }
 
       // Crear URL para el video
       const videoUrl = URL.createObjectURL(file);
+      console.log("[DEBUG Videos] URL de video creado:", videoUrl);
 
       // Generar thumbnail
-      const thumbnailUrl = await generateVideoThumbnail(file);
+      console.log("[DEBUG Videos] Iniciando generación de thumbnail...");
+      let thumbnail;
+      try {
+        thumbnail = await generateVideoThumbnail(file);
+        console.log("[DEBUG Videos] Thumbnail generado con éxito");
+      } catch (thumbnailError) {
+        console.error("[ERROR Videos] No se pudo generar thumbnail, usando video URL como fallback:", thumbnailError);
+        thumbnail = videoUrl;
+      }
 
-      // Agregar video con thumbnail generado
+      // Añadir el video con su miniatura
       handleAddVideo({
         id: generateId(),
         details: {
           src: videoUrl,
         },
         metadata: {
-          previewUrl: thumbnailUrl,
+          previewUrl: thumbnail,
           fileName: file.name,
         },
-      } as any);
-    } catch (error) {
-      console.error("Error procesando video:", error);
+      });
 
-      // Si falla la generación del thumbnail, usar el video directamente como preview
-      const videoUrl = URL.createObjectURL(file);
-
-      handleAddVideo({
-        id: generateId(),
-        details: {
-          src: videoUrl,
-        },
-        metadata: {
-          previewUrl: videoUrl,
-          fileName: file.name,
-        },
-      } as any);
-    } finally {
-      // Resetear input y estado
+      // Limpiar el input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    } catch (error) {
+      console.error("[ERROR Videos] Error procesando archivo:", error);
+    } finally {
       setIsGeneratingThumbnail(false);
     }
+  };
+
+  // Abrir diálogo de selección de archivo
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -131,7 +154,7 @@ export const Videos = () => {
           size="sm"
           variant="ghost"
           className="flex items-center gap-1"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleUploadClick}
           disabled={isGeneratingThumbnail}
         >
           {isGeneratingThumbnail ? (
@@ -149,9 +172,9 @@ export const Videos = () => {
         <input
           type="file"
           ref={fileInputRef}
-          onChange={handleFileUpload}
-          accept="video/*"
           className="hidden"
+          accept="video/*"
+          onChange={handleFileUpload}
         />
       </div>
       <ScrollArea>
@@ -226,3 +249,4 @@ const VideoItem = ({
     </Draggable>
   );
 };
+

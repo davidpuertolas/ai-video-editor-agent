@@ -197,9 +197,15 @@ class Video extends VideoBase {
   // load fallback thumbnail, resize it and cache it
   private async loadFallbackThumbnail() {
     const fallbackThumbnail = this.previewUrl;
-    if (!fallbackThumbnail) return;
+    if (!fallbackThumbnail) {
+      console.error("[ERROR Video] No hay previewUrl disponible para el video:", this.id);
+      return;
+    }
 
-    console.log("[DEBUG] Cargando thumbnail para video:", this.id, "URL tipo:", fallbackThumbnail.substring(0, 30) + "...");
+    console.log("[DEBUG Video] Cargando thumbnail para video:", this.id);
+    console.log("[DEBUG Video] URL tipo:", fallbackThumbnail.substring(0, 30) + "...");
+    console.log("[DEBUG Video] Es data URL:", fallbackThumbnail.startsWith('data:'));
+    console.log("[DEBUG Video] Es blob URL:", fallbackThumbnail.startsWith('blob:'));
 
     return new Promise<void>((resolve) => {
       const img = new Image();
@@ -208,12 +214,17 @@ class Video extends VideoBase {
       // Para URLs de datos y URLs de objeto, no necesitamos añadir parámetros extra
       if (fallbackThumbnail.startsWith('data:') || fallbackThumbnail.startsWith('blob:')) {
         img.src = fallbackThumbnail;
+        console.log("[DEBUG Video] Usando URL directamente sin modificaciones");
       } else {
         // Para URLs remotas, añadimos un timestamp para evitar caché
-        img.src = fallbackThumbnail + "?t=" + Date.now();
+        const cacheBuster = "?t=" + Date.now();
+        img.src = fallbackThumbnail + cacheBuster;
+        console.log("[DEBUG Video] Añadiendo cache-buster a URL remota:", cacheBuster);
       }
 
       img.onload = () => {
+        console.log("[DEBUG Video] Imagen cargada correctamente. Tamaño original:", img.width, "x", img.height);
+
         // Create a temporary canvas to resize the image
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d")!;
@@ -230,20 +241,62 @@ class Video extends VideoBase {
 
         // Create new image from resized canvas
         const resizedImg = new Image();
+        resizedImg.onload = () => {
+          console.log("[DEBUG Video] Imagen redimensionada correctamente:", targetWidth, "x", targetHeight);
+
+          // Update aspect ratio and cache the resized image
+          this.aspectRatio = aspectRatio;
+          this.thumbnailWidth = targetWidth;
+          this.thumbnailCache.setThumbnail("fallback", resizedImg);
+
+          console.log("[DEBUG Video] Thumbnail guardado en caché con ID 'fallback'");
+          resolve();
+        };
+
         resizedImg.src = canvas.toDataURL();
-
-        // Update aspect ratio and cache the resized image
-        this.aspectRatio = aspectRatio;
-        this.thumbnailWidth = targetWidth;
-        this.thumbnailCache.setThumbnail("fallback", resizedImg);
-
-        console.log("[DEBUG] Thumbnail cargado correctamente para video:", this.id);
-        resolve();
       };
 
       img.onerror = (err) => {
-        console.error("[ERROR] No se pudo cargar la miniatura:", err);
-        resolve(); // Resolver de todos modos para no bloquear la carga
+        console.error("[ERROR Video] No se pudo cargar la miniatura:", err);
+        console.error("[ERROR Video] URL problemática:", fallbackThumbnail.substring(0, 100) + "...");
+
+        // Intentar crear una miniatura de color sólido como último recurso
+        try {
+          console.log("[DEBUG Video] Creando miniatura de color sólido como fallback");
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d")!;
+
+          // Usar proporciones predeterminadas si no se pueden determinar
+          const aspectRatio = 16/9; // Proporción por defecto
+          const targetHeight = 40;
+          const targetWidth = Math.round(targetHeight * aspectRatio);
+
+          // Configurar canvas y dibujar un rectángulo
+          canvas.height = targetHeight;
+          canvas.width = targetWidth;
+          ctx.fillStyle = "#666666"; // Gris oscuro
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+          // Añadir un poco de texto o indicadores
+          ctx.fillStyle = "#ffffff"; // Blanco
+          ctx.font = "12px Arial";
+          ctx.fillText("Video", 5, 20);
+
+          // Crear imagen del canvas
+          const placeholderImg = new Image();
+          placeholderImg.onload = () => {
+            this.aspectRatio = aspectRatio;
+            this.thumbnailWidth = targetWidth;
+            this.thumbnailCache.setThumbnail("fallback", placeholderImg);
+            console.log("[DEBUG Video] Thumbnail placeholder creado correctamente");
+            resolve();
+          };
+
+          placeholderImg.src = canvas.toDataURL();
+        } catch (fallbackError) {
+          console.error("[ERROR Video] Fallo incluso al crear placeholder:", fallbackError);
+          resolve(); // Resolver de todos modos para no bloquear
+        }
       };
     });
   }

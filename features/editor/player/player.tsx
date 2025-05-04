@@ -49,7 +49,10 @@ const Player = () => {
       className="relative w-full h-full"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      style={{ zIndex: 150 }}
+      style={{
+        zIndex: 150,
+        backgroundColor: "#000000" // Fondo negro para el contenedor del player
+      }}
     >
       {/* Indicador de reproducción */}
       {isPlaying && (
@@ -76,26 +79,54 @@ const Player = () => {
           transition: 'box-shadow 0.3s ease-in-out',
           position: 'relative',
           zIndex: 200,
+          backgroundColor: "#000000" // Fondo negro para el player
         }}
       />
 
-      {/* Indicador de esquina (sutil) */}
+      {/* Indicador de esquina (sutil) - mantener para efectos decorativos */}
       <div
         className={`absolute top-0 left-0 w-16 h-16 pointer-events-none transition-opacity duration-300 ${isHovering || isPlaying ? 'opacity-30' : 'opacity-0'}`}
         style={{
           background: 'linear-gradient(135deg, rgba(156, 90, 250, 0.4) 0%, transparent 70%)',
-          zIndex: 10,
+          zIndex: 210, // Asegurar que esté por encima del player
         }}
       />
 
-      {/* Reflejo inferior (efecto de cristal) */}
+      {/* Decoración de las esquinas - visible siempre */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none opacity-10"
+        className="absolute top-0 left-0 w-12 h-12 pointer-events-none"
         style={{
-          background: 'linear-gradient(to top, rgba(255, 255, 255, 0.15), transparent)',
-          transform: 'translateY(50%) scaleY(0.5)',
-          filter: 'blur(5px)',
-          zIndex: 10,
+          borderTop: '2px solid rgba(156, 90, 250, 0.7)',
+          borderLeft: '2px solid rgba(156, 90, 250, 0.7)',
+          borderTopLeftRadius: '4px',
+          zIndex: 210,
+        }}
+      />
+      <div
+        className="absolute top-0 right-0 w-12 h-12 pointer-events-none"
+        style={{
+          borderTop: '2px solid rgba(156, 90, 250, 0.7)',
+          borderRight: '2px solid rgba(156, 90, 250, 0.7)',
+          borderTopRightRadius: '4px',
+          zIndex: 210,
+        }}
+      />
+      <div
+        className="absolute bottom-0 left-0 w-12 h-12 pointer-events-none"
+        style={{
+          borderBottom: '2px solid rgba(156, 90, 250, 0.7)',
+          borderLeft: '2px solid rgba(156, 90, 250, 0.7)',
+          borderBottomLeftRadius: '4px',
+          zIndex: 210,
+        }}
+      />
+      <div
+        className="absolute bottom-0 right-0 w-12 h-12 pointer-events-none"
+        style={{
+          borderBottom: '2px solid rgba(156, 90, 250, 0.7)',
+          borderRight: '2px solid rgba(156, 90, 250, 0.7)',
+          borderBottomRightRadius: '4px',
+          zIndex: 210,
         }}
       />
     </div>

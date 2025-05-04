@@ -30,7 +30,7 @@ const Board = forwardRef<HTMLDivElement, BoardProps>(
           boxShadow: "0 0 30px rgba(128, 55, 220, 0.5), 0 0 80px rgba(98, 33, 234, 0.3)",
           border: "1px solid rgba(156, 90, 250, 0.6)",
           backdropFilter: "blur(3px)",
-          backgroundColor: "rgba(20, 10, 35, 0.85)",
+          backgroundColor: "#000000",
           zIndex: 100,
           ...style,
         }}
@@ -69,31 +69,35 @@ const SceneBoard = ({
           width: size.width,
           height: size.height,
           zIndex: 2,
+          backgroundColor: "#000000",
         }}
         className={`pointer-events-none absolute border transition-colors duration-300 ease-in-out ${
           isDraggingOver
             ? "border-4 border-dashed border-purple-400 bg-white/[0.075]"
-            : "border border-purple-400/60 bg-transparent"
+            : "border border-purple-400/60 bg-black"
         } shadow-[0_0_0_5000px_rgba(13,6,22,0.95)]`}
       />
 
-      {/* Elementos decorativos para un aspecto más futurista - nivel inferior */}
-      <div className="absolute inset-0 pointer-events-none"
-           style={{
-             background: "linear-gradient(135deg, rgba(156, 90, 250, 0.07) 0%, transparent 100%)",
-             zIndex: 1,
-           }}
-      />
+      {/* Elementos decorativos para un aspecto más futurista - esquinas del canvas */}
       <div className="absolute top-0 right-0 left-0 h-[1px] pointer-events-none"
            style={{
              background: "linear-gradient(90deg, transparent 0%, rgba(156, 90, 250, 0.5) 50%, transparent 100%)",
-             zIndex: 1,
+             zIndex: 3,
            }}
       />
       <div className="absolute bottom-0 right-0 left-0 h-[1px] pointer-events-none"
            style={{
              background: "linear-gradient(90deg, transparent 0%, rgba(156, 90, 250, 0.5) 50%, transparent 100%)",
-             zIndex: 1,
+             zIndex: 3,
+           }}
+      />
+      <div className="absolute left-0 right-0 top-0 bottom-0 pointer-events-none"
+           style={{
+             borderWidth: "1px",
+             borderStyle: "solid",
+             borderColor: "rgba(156, 90, 250, 0.3)",
+             borderRadius: "4px",
+             zIndex: 3,
            }}
       />
 
