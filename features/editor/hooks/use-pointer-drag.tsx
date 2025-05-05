@@ -217,6 +217,15 @@ export function usePointerDrag<T>(
       const deltaX = e.clientX - startX;
       const deltaY = e.clientY - startY;
 
+      console.log("usePointerDrag - getData:", {
+        x: e.clientX,
+        y: e.clientY,
+        deltaX,
+        deltaY,
+        startX,
+        startY
+      });
+
       return {
         x: e.clientX,
         y: e.clientY,
@@ -243,11 +252,13 @@ export function usePointerDrag<T>(
 
       if (!infoRef.current.dragging) {
         if (!dragPredicate || dragPredicate(data)) {
+          console.log("usePointerDrag - Drag started:", data);
           handleEvent(e);
           infoRef.current.dragging = true;
           onStart?.(data);
         }
       } else {
+        console.log("usePointerDrag - Dragging:", { x: data.x, y: data.y, deltaX: data.deltaX, deltaY: data.deltaY });
         handleEvent(e);
         onMove?.(data);
       }
@@ -256,9 +267,11 @@ export function usePointerDrag<T>(
     const handleUp = (e: PointerEvent) => {
       const data = getData(e);
       if (infoRef.current.dragging) {
+        console.log("usePointerDrag - Drag ended:", data);
         handleEvent(e);
         onEnd?.(data);
       } else {
+        console.log("usePointerDrag - Click (no drag):", data);
         onClick?.(data);
       }
 

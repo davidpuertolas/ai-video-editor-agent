@@ -8,6 +8,9 @@ import { dispatch, filter, subject } from "@designcombo/events";
 import {
   TIMELINE_BOUNDING_CHANGED,
   TIMELINE_PREFIX,
+  SELECTION_CREATED,
+  SELECTION_UPDATED,
+  SELECTION_CLEARED,
 } from "@designcombo/timeline";
 import useStore from "../store/use-store";
 import Playhead from "./playhead";
@@ -20,6 +23,16 @@ import {
 } from "../constants/constants";
 import { ITrackItem } from "@designcombo/types";
 import PreviewTrackItem from "./items/preview-drag-item";
+import SelectionModal from "./selection-modal";
+
+// Monitor @designcombo/timeline constants
+console.log("Timeline constants imported:", {
+  TIMELINE_BOUNDING_CHANGED,
+  TIMELINE_PREFIX,
+  SELECTION_CREATED: (typeof SELECTION_CREATED !== 'undefined') ? SELECTION_CREATED : 'undefined',
+  SELECTION_UPDATED: (typeof SELECTION_UPDATED !== 'undefined') ? SELECTION_UPDATED : 'undefined',
+  SELECTION_CLEARED: (typeof SELECTION_CLEARED !== 'undefined') ? SELECTION_CLEARED : 'undefined',
+});
 
 CanvasTimeline.registerItems({
   Text,
@@ -303,11 +316,12 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
   };
 
   useEffect(() => {
-    const addEvents = subject.pipe(
+    const timelineEvents = subject.pipe(
       filter(({ key }) => key.startsWith(TIMELINE_PREFIX)),
     );
 
-    const subscription = addEvents.subscribe((obj) => {
+    const subscription = timelineEvents.subscribe((obj) => {
+      console.log("Timeline event:", obj.key, obj.value);
       if (obj.key === TIMELINE_BOUNDING_CHANGED) {
         const bounding = obj.value?.payload?.bounding;
         if (bounding) {
@@ -483,6 +497,8 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
         </div>
       </div>
 
+      {/* Selection Modal */}
+      <SelectionModal />
     </div>
   );
 };
