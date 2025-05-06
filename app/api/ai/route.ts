@@ -231,10 +231,124 @@ function extractImageTimesFromMessage(messageContent: string): { startTime: numb
   return { startTime, endTime };
 }
 
+// Nueva función para manejar los mensajes del chat de la timeline
+async function handleTimelineChat(
+  message: string,
+  selectedItems: any[],
+  selectedText: string,
+  urlAnalysis: any,
+  showScreenshotDetection: any,
+  applyTransitionDetection: any
+): Promise<any> {
+  try {
+    // Extraer el contenido relevante de los elementos seleccionados
+    const extractedContent = selectedItems.map(item => {
+      if (item.text) return item.text;
+      if (item.details?.text) return item.details.text;
+      if (item.name) return item.name;
+      if (item.content) return item.content;
+      if (typeof item === 'string') return item;
+      return JSON.stringify(item);
+    }).join('\n');
+
+    // Incluir información sobre las URLs detectadas en el mensaje del sistema
+    let systemPrompt = "Eres un asistente de edición de video que ayuda a analizar y mejorar los elementos seleccionados en una timeline. Responde de manera concisa y útil.";
+
+    // Si hay URLs en el texto, añadir información sobre ellas
+    if (urlAnalysis && urlAnalysis.containsURLs) {
+      systemPrompt += `\n\nEl texto seleccionado contiene las siguientes URLs:\n${urlAnalysis.urls.join('\n')}\n\n`;
+
+      // Informar que las capturas pueden ser aplicadas a la timeline
+      systemPrompt += "Hay capturas de pantalla disponibles de estas URLs. El usuario puede pedirte que apliques estas capturas directamente a la timeline del video o que se las muestres en el chat.";
+
+      // Añadir información adicional sobre la detección específica si existe
+      if (showScreenshotDetection && showScreenshotDetection.detected) {
+        if (showScreenshotDetection.reason.includes("timeline")) {
+          systemPrompt += " El usuario parece interesado en aplicar estas capturas a la timeline, así que hazle saber que ya se han aplicado como elementos de imagen en la timeline del video.";
+        } else {
+          systemPrompt += " El usuario parece interesado en ver estas capturas, así que hazle saber que puede pedirte aplicarlas a la timeline escribiendo mensajes como 'aplica la captura a la timeline' o 'añade la imagen al video'.";
+        }
+      }
+    }
+
+    // Añadir información sobre la detección de transiciones si existe
+    if (applyTransitionDetection && applyTransitionDetection.detected) {
+      systemPrompt += "\n\nEl usuario ha solicitado aplicar una transición a la timeline. Informa que la transición se ha aplicado correctamente en la timeline del video.";
+    }
+
+    const chatResponse = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Elementos seleccionados:\n${extractedContent}\n\nTexto seleccionado: ${selectedText || extractedContent}\n\nMensaje del usuario: ${message}` }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    // Crear estructura con formato similar al de otras detecciones en la API
+    let screenshotData = null;
+    let transitionData = null;
+
+    if (urlAnalysis && urlAnalysis.containsURLs && showScreenshotDetection) {
+      // Usar un umbral mucho más bajo de confianza (0.2) para la detección
+      screenshotData = {
+        detected: showScreenshotDetection.detected && showScreenshotDetection.confidence > 0.2,
+        confidence: showScreenshotDetection.confidence,
+        reason: showScreenshotDetection.reason,
+        urls: urlAnalysis.urls,
+        screenshots: urlAnalysis.screenshots || []
+      };
+    }
+
+    // Añadir información sobre transiciones detectadas
+    if (applyTransitionDetection) {
+      // Usar el mismo umbral bajo de confianza (0.2) para la detección
+      transitionData = {
+        detected: applyTransitionDetection.detected && applyTransitionDetection.confidence > 0.2,
+        confidence: applyTransitionDetection.confidence,
+        reason: applyTransitionDetection.reason,
+        transitionPath: applyTransitionDetection.transitionPath || '/transitions/transition1.gif'
+      };
+    }
+
+    return {
+      success: true,
+      response: chatResponse.choices[0].message.content,
+      usage: chatResponse.usage,
+      screenshotData: screenshotData,
+      transitionData: transitionData
+    };
+  } catch (error) {
+    console.error("Error en handleTimelineChat:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error desconocido"
+    };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json();
+    console.log("Request body:", body);
+
+    // Verificar si es una solicitud del chat de la timeline
+    if (body.type === 'timeline_chat') {
+      const { message, selectedItems, selectedText, urlAnalysis, showScreenshotDetection, applyTransitionDetection } = body;
+      const response = await handleTimelineChat(
+        message,
+        selectedItems,
+        selectedText,
+        urlAnalysis,
+        showScreenshotDetection,
+        applyTransitionDetection
+      );
+      return NextResponse.json(response);
+    }
+
     // Extraer los mensajes del cuerpo de la solicitud
-    const { messages, lastImageUrl = "" } = await req.json();
+    const { messages, lastImageUrl = "" } = body;
 
     // Validar que se proporcionaron mensajes
     if (!messages || !Array.isArray(messages)) {
@@ -624,10 +738,10 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
     });
 
   } catch (error) {
-    console.error('Error en la API de chat:', error);
-    return NextResponse.json(
-      { error: 'Error al procesar la solicitud de chat' },
-      { status: 500 }
-    );
+    console.error("Error processing request:", error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    }, { status: 500 });
   }
 }

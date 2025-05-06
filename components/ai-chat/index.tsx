@@ -9,6 +9,7 @@ import useDataState from "@/features/editor/store/use-data-state";
 import { useStateManager } from "@/features/editor/hooks/state-manager";
 import { createVideoCommandExecutor, VideoCommandExecutor } from "./ai-video-commands";
 import { createUploadsDetails } from "@/utils/upload";
+import CommandExecutorService from "@/features/editor/services/command-executor-service";
 
 // Función para extraer tiempos de inicio y fin de una imagen a partir del mensaje
 function extractImageTimesFromMessage(messageContent: string): { startTime: number, endTime: number } {
@@ -356,6 +357,14 @@ export default function AIChat() {
   const { timeline, scenes, playerRef } = useDataState();
   const commandExecutor = useRef<VideoCommandExecutor>(createVideoCommandExecutor(stateManager));
 
+  // Inicializar el CommandExecutorService con el executor actual
+  useEffect(() => {
+    if (commandExecutor.current) {
+      CommandExecutorService.setExecutor(commandExecutor.current);
+      console.log("CommandExecutorService inicializado con éxito");
+    }
+  }, [commandExecutor.current]);
+
   // Función para reiniciar el chat
   const resetChat = () => {
     setMessages([
@@ -380,6 +389,9 @@ export default function AIChat() {
   // Actualizar el ejecutor de comandos cuando cambie el stateManager
   useEffect(() => {
     commandExecutor.current = createVideoCommandExecutor(stateManager);
+    // Actualizar el servicio con la nueva instancia del ejecutor
+    CommandExecutorService.setExecutor(commandExecutor.current);
+    console.log("CommandExecutorService actualizado con una nueva instancia del ejecutor");
   }, [stateManager]);
 
   // Manejar click en el botón de imagen

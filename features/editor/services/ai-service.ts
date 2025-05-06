@@ -28,6 +28,38 @@ interface URLScreenshotInfo {
   screenshotPath: string;
 }
 
+// Nueva interfaz para la detección de aplicar transiciones
+interface TransitionDetectionResult {
+  detected: boolean;
+  confidence: number;
+  reason: string;
+  transitionPath?: string;
+}
+
+// Nueva interfaz para solicitudes de chat
+interface ChatRequest {
+  message: string;
+  selectedItems: any[];
+}
+
+// Nueva interfaz para respuestas de chat
+interface ChatResponse {
+  success: boolean;
+  response?: string;
+  error?: string;
+  urlAnalysis?: {
+    containsURLs: boolean;
+    urls: string[];
+    screenshots?: URLScreenshotInfo[];
+  };
+  showScreenshotDetection?: {
+    detected: boolean;
+    confidence: number;
+    reason: string;
+  };
+  applyTransitionDetection?: TransitionDetectionResult;
+}
+
 export class AIService {
   /**
    * Analiza los elementos seleccionados para buscar URLs
@@ -200,6 +232,431 @@ export class AIService {
         "El contenido no contiene URLs. Si necesita incluir referencias web, considere añadirlas.",
         "Puede añadir enlaces a recursos adicionales para enriquecer el contenido."
       ];
+    }
+  }
+
+  /**
+   * Detecta si el mensaje del usuario tiene intención de aplicar una transición
+   * @returns Objeto con la detección, nivel de confianza y el motivo
+   */
+  private static detectApplyTransitionIntention(message: string): TransitionDetectionResult {
+    if (!message) {
+      return {
+        detected: false,
+        confidence: 0,
+        reason: "Mensaje vacío"
+      };
+    }
+
+    // Si hay mención explícita a capturas, evitar detección de transición
+    // para evitar falsos positivos cuando se combinen ambos términos
+    if (/(?:captura|screenshot|imagen)\s+(?:de)?\s+pantalla/i.test(message) ||
+        /mostrar\s+(?:captura|screenshot|imagen)/i.test(message)) {
+      return {
+        detected: false,
+        confidence: 0,
+        reason: "Se detectó intención de captura de pantalla en su lugar"
+      };
+    }
+
+    // Patrones para detectar solicitudes de aplicar transiciones
+    const transitionPatterns = [
+      // Patrones de alta confianza - solicitudes muy específicas
+      {
+        pattern: /(?:aplica|agrega|añade|pon|coloca|mete|inserta)(?:r)?\s+(?:una|la)?\s+transici[óo]n(?:\s+(?:smooth|suave|elegante|de video|entre|visual))?/i,
+        confidence: 0.98,
+        description: "Solicitud directa de aplicar transición"
+      },
+      {
+        pattern: /transici[óo]n(?:\s+(?:smooth|suave|elegante))?(?:\s+(?:entre|para|en(?:tre)?)\s+(?:el|los)\s+(?:video|clip|elemento|segmento))?/i,
+        confidence: 0.95,
+        description: "Mención a transición con calificadores"
+      },
+      {
+        pattern: /efecto\s+(?:de)?\s+transici[óo]n/i,
+        confidence: 0.90,
+        description: "Mención a efecto de transición"
+      },
+      // Patrones de media confianza
+      {
+        pattern: /a[ñn]adir\s+(?:una|la)?\s+transici[óo]n/i,
+        confidence: 0.88,
+        description: "Solicitud de añadir transición"
+      },
+      {
+        pattern: /a[ñn]adir\s+efecto\s+(?:de)?\s+transici[óo]n/i,
+        confidence: 0.85,
+        description: "Solicitud de añadir efecto de transición"
+      },
+      {
+        pattern: /efecto\s+visual\s+(?:de)?\s+transici[óo]n/i,
+        confidence: 0.83,
+        description: "Mención a efecto visual de transición"
+      },
+      // Patrones de baja confianza
+      {
+        pattern: /transici[óo]n\s+de\s+video/i,
+        confidence: 0.80,
+        description: "Mención a transición de video"
+      },
+      {
+        pattern: /transici[óo]n\s+smooth/i,
+        confidence: 0.80,
+        description: "Mención a transición smooth"
+      },
+      {
+        pattern: /transici[óo]n\s+suave/i,
+        confidence: 0.80,
+        description: "Mención a transición suave"
+      },
+      {
+        pattern: /implementa\s+transici[óo]n/i,
+        confidence: 0.78,
+        description: "Instrucción de implementar transición"
+      },
+      {
+        pattern: /smooth\s+transition/i,
+        confidence: 0.78,
+        description: "Mención a smooth transition (inglés)"
+      },
+      {
+        pattern: /transici[óo]n/i,
+        confidence: 0.75,
+        description: "Mención general a transición"
+      }
+    ];
+
+    // Buscar el patrón con mayor confianza que coincida
+    for (const item of transitionPatterns) {
+      if (item.pattern.test(message)) {
+        return {
+          detected: true,
+          confidence: item.confidence,
+          reason: item.description,
+          transitionPath: '/transitions/transition1.gif' // Path predeterminado para la transición
+        };
+      }
+    }
+
+    // No se detectó ninguna intención de aplicar transición
+    return {
+      detected: false,
+      confidence: 0,
+      reason: "No se detectó intención de aplicar transición"
+    };
+  }
+
+  /**
+   * Detecta si el mensaje del usuario tiene intención de mostrar capturas de pantalla
+   * @returns Objeto con la detección, nivel de confianza y el motivo
+   */
+  private static detectShowScreenshotIntention(message: string): {
+    detected: boolean;
+    confidence: number;
+    reason: string;
+  } {
+    if (!message) {
+      return {
+        detected: false,
+        confidence: 0,
+        reason: "Mensaje vacío"
+      };
+    }
+
+    // Si hay mención explícita a transiciones, evitar detección de capturas
+    if (/transici[óo]n/i.test(message) || /smooth\s+transition/i.test(message)) {
+      // Verificar si hay mención explícita y fuerte a capturas que supere la mención a transiciones
+      const hasExplicitScreenshotMention = /(?:aplica|agrega|añade|pon|coloca|inserta|incorpora)(?:la|lo|r)?\s+(?:captura|screenshot|imagen)/i.test(message);
+
+      if (!hasExplicitScreenshotMention) {
+        return {
+          detected: false,
+          confidence: 0,
+          reason: "Se detectó intención de transición en su lugar"
+        };
+      }
+    }
+
+    // Patrones específicos para aplicar a la timeline
+    const timelinePatterns = [
+      {
+        pattern: /(?:aplica|agrega|añade|pon|coloca|inserta|incorpora)(?:la|lo|r)?\s+(?:captura|screenshot|imagen|vista|preview)/i,
+        confidence: 0.98,
+        description: "Solicitud directa de aplicar captura a la timeline"
+      },
+      {
+        pattern: /(?:aplica|agrega|añade|pon|coloca|inserta|incorpora)(?:la|lo)?\s+(?:a la|al|en la|en el)?\s+(?:timeline|línea de tiempo)/i,
+        confidence: 0.95,
+        description: "Solicitud directa de añadir a la timeline"
+      },
+      {
+        pattern: /(?:usa|usar|utiliza|utilizar)(?:la|lo)?\s+(?:captura|screenshot|imagen|vista|preview)/i,
+        confidence: 0.93,
+        description: "Solicitud de usar captura"
+      }
+    ];
+
+    // Patrones muy específicos con alta confianza
+    const highConfidencePatterns = [
+      {
+        pattern: /muestra(?:me)?\s+(?:la|el|una|un)?\s+(?:captura|screenshot|imagen|vista|preview)/i,
+        confidence: 0.95,
+        description: "Solicitud directa de mostrar captura"
+      },
+      {
+        pattern: /ver\s+(?:la|el|una|un)?\s+(?:captura|screenshot|imagen|vista|preview)/i,
+        confidence: 0.95,
+        description: "Solicitud de ver captura"
+      },
+      {
+        pattern: /enseña(?:me)?\s+(?:la|el|una|un)?\s+(?:captura|screenshot|imagen|vista|preview)/i,
+        confidence: 0.95,
+        description: "Solicitud de enseñar captura"
+      }
+    ];
+
+    // Patrones menos específicos pero igualmente válidos
+    const mediumConfidencePatterns = [
+      {
+        pattern: /(?:quiero|necesito|me gustaría)\s+ver\s+(?:la|el|una|un)?\s+(?:captura|screenshot|imagen)/i,
+        confidence: 0.88,
+        description: "Expresión de deseo de ver captura específica"
+      },
+      {
+        pattern: /(?:puedes|podrías|puedo)\s+ver\s+(?:la|el|una|un)?\s+(?:captura|screenshot|imagen)/i,
+        confidence: 0.88,
+        description: "Pregunta sobre posibilidad de ver captura específica"
+      },
+      {
+        pattern: /mostrar\s+(?:captura|screenshot|imagen)/i,
+        confidence: 0.85,
+        description: "Mención a mostrar captura específica"
+      },
+      {
+        pattern: /visualizar\s+(?:captura|screenshot|imagen)/i,
+        confidence: 0.85,
+        description: "Mención a visualizar captura específica"
+      },
+      {
+        pattern: /(?:quiero|necesito|me gustaría)\s+ver/i,
+        confidence: 0.70,
+        description: "Expresión de deseo de ver"
+      },
+      {
+        pattern: /(?:puedes|podrías|puedo)\s+ver/i,
+        confidence: 0.70,
+        description: "Pregunta sobre posibilidad de ver"
+      }
+    ];
+
+    // Patrones muy generales pero que podrían indicar intención
+    const lowConfidencePatterns = [
+      {
+        pattern: /captura\s+(?:de)?\s+pantalla/i,
+        confidence: 0.80,
+        description: "Mención específica a captura de pantalla"
+      },
+      {
+        pattern: /screenshot/i,
+        confidence: 0.75,
+        description: "Mención a screenshot"
+      },
+      {
+        pattern: /ver\s+imagen/i,
+        confidence: 0.75,
+        description: "Mención a ver imagen"
+      },
+      {
+        pattern: /captura/i,
+        confidence: 0.65,
+        description: "Mención a captura"
+      },
+      {
+        pattern: /imagen/i,
+        confidence: 0.60,
+        description: "Mención a imagen"
+      },
+      {
+        pattern: /ver/i,
+        confidence: 0.40,
+        description: "Mención a ver"
+      },
+      {
+        pattern: /pantalla/i,
+        confidence: 0.40,
+        description: "Mención a pantalla"
+      },
+      {
+        pattern: /url/i,
+        confidence: 0.40,
+        description: "Mención a URL"
+      },
+      {
+        pattern: /link/i,
+        confidence: 0.40,
+        description: "Mención a link"
+      },
+      {
+        pattern: /enlace/i,
+        confidence: 0.40,
+        description: "Mención a enlace"
+      }
+    ];
+
+    // Primero comprobar patrones específicos de timeline
+    for (const item of timelinePatterns) {
+      if (item.pattern.test(message)) {
+        return {
+          detected: true,
+          confidence: item.confidence,
+          reason: item.description
+        };
+      }
+    }
+
+    // Luego buscar en el resto de patrones
+    // Combinar todos los patrones
+    const allPatterns = [...highConfidencePatterns, ...mediumConfidencePatterns, ...lowConfidencePatterns];
+
+    // Buscar el patrón con mayor confianza que coincida
+    for (const item of allPatterns) {
+      if (item.pattern.test(message)) {
+        return {
+          detected: true,
+          confidence: item.confidence,
+          reason: item.description
+        };
+      }
+    }
+
+    // Si hay alguna referencia a URLs en general - REDUCIR CONFIANZA
+    if (message.toLowerCase().includes('url') ||
+        message.toLowerCase().includes('web') ||
+        message.toLowerCase().includes('link') ||
+        message.toLowerCase().includes('enlace')) {
+      return {
+        detected: true,
+        confidence: 0.5,
+        reason: "Posible interés en contenido web"
+      };
+    }
+
+    // Detectar preguntas generales - REDUCIR CONFIANZA
+    if (message.toLowerCase().includes('?') ||
+        message.toLowerCase().includes('¿') ||
+        /(?:puedes|podrías|me puedes)/i.test(message)) {
+      return {
+        detected: true,
+        confidence: 0.3,
+        reason: "Pregunta que podría implicar intención visual"
+      };
+    }
+
+    // Detección por defecto - REDUCIR CONFIANZA AÚN MÁS
+    if (message.length >= 5) {
+      return {
+        detected: true,
+        confidence: 0.2,
+        reason: "Detección por defecto"
+      };
+    }
+
+    // Si no coincide ningún patrón y es muy corto
+    return {
+      detected: false,
+      confidence: 0,
+      reason: "No se detectó intención de mostrar captura"
+    };
+  }
+
+  /**
+   * Envía un mensaje al chat de la IA y devuelve la respuesta
+   */
+  public static async sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+    try {
+      // Primero, analizar el texto del mensaje para detectar URLs
+      const selectedText = this.extractTextFromElements(request.selectedItems);
+      const urlAnalysis = this.detectURLs(selectedText);
+
+      // Si hay URLs, generar capturas de pantalla
+      if (urlAnalysis.containsURLs) {
+        urlAnalysis.screenshots = this.getScreenshotsForUrls(urlAnalysis.urls);
+      }
+
+      // Determinar si debemos mostrar la captura de pantalla
+      const showScreenshotDetection = this.detectShowScreenshotIntention(request.message);
+
+      // Determinar si debemos aplicar una transición
+      const applyTransitionDetection = this.detectApplyTransitionIntention(request.message);
+
+      // Asegurarse de que solo una de las detecciones sea positiva con alta confianza
+      let finalShowScreenshot = { ...showScreenshotDetection };
+      let finalApplyTransition = { ...applyTransitionDetection };
+
+      // Si ambas son detectadas, priorizar la que tenga mayor confianza
+      if (showScreenshotDetection.detected && applyTransitionDetection.detected) {
+        // Añadir un margen de seguridad para la transición (priorizar la transición ligeramente)
+        const transitionConfidence = applyTransitionDetection.confidence;
+        const screenshotConfidence = showScreenshotDetection.confidence * 0.95; // 5% de penalización
+
+        console.log(`Detección doble: Transición (${transitionConfidence}) vs Screenshot (${screenshotConfidence})`);
+
+        if (screenshotConfidence > transitionConfidence) {
+          // Priorizar screenshot, desactivar transición
+          finalApplyTransition.detected = false;
+          finalApplyTransition.confidence = 0;
+          finalApplyTransition.reason = "Priorizada la detección de captura de pantalla";
+
+          console.log("Priorizada captura de pantalla sobre transición");
+        } else {
+          // Priorizar transición, desactivar screenshot
+          finalShowScreenshot.detected = false;
+          finalShowScreenshot.confidence = 0;
+          finalShowScreenshot.reason = "Priorizada la detección de transición";
+
+          console.log("Priorizada transición sobre captura de pantalla");
+        }
+      }
+
+      // Enviar todo a la API junto con el mensaje del usuario
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'timeline_chat',
+          message: request.message,
+          selectedItems: request.selectedItems,
+          selectedText: selectedText,
+          urlAnalysis: urlAnalysis,
+          showScreenshotDetection: finalShowScreenshot,
+          applyTransitionDetection: finalApplyTransition
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        return {
+          success: true,
+          response: data.response,
+          urlAnalysis: urlAnalysis,
+          showScreenshotDetection: finalShowScreenshot,
+          applyTransitionDetection: finalApplyTransition
+        };
+      } else {
+        return {
+          success: false,
+          error: data.error || 'Error desconocido al procesar la solicitud'
+        };
+      }
+    } catch (error) {
+      console.error('Error en chat de timeline:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 }
