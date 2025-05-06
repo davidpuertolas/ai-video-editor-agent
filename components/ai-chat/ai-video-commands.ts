@@ -234,6 +234,9 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
       const startTime = options?.startTime || 0; // Por defecto al inicio
       const endTime = options?.endTime || 10; // Por defecto 10 segundos de duración
 
+      // Detectar si es un archivo APNG para tratamiento especial
+      const isAPNG = url.toLowerCase().endsWith('.apng');
+
       // Crear payload para el video
       const videoPayload = {
         id: generateId(),
@@ -247,6 +250,14 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
           width: width,
           height: height,
           opacity: 100,
+          // Para APNG, añadir propiedades adicionales para posicionamiento a pantalla completa
+          ...(isAPNG && {
+            scaleMode: "cover", // Usar "cover" en lugar de "fit" para asegurar que cubra todo
+            left: 0.5, // Centrado horizontalmente
+            top: 0.5,  // Centrado verticalmente
+            originX: "center", // Origen en el centro
+            originY: "center", // Origen en el centro
+          })
         },
       };
 
@@ -255,9 +266,14 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
         payload: videoPayload,
         options: {
           resourceId: "main",
-          scaleMode: "fit",
+          scaleMode: isAPNG ? "cover" : "fit", // Usar cover para APNG, fit para otros videos
+          ...(isAPNG && {
+            position: { x: 0.5, y: 0.5 } // Centrar para APNG
+          })
         },
       });
+
+      console.log(`Video ${isAPNG ? 'APNG' : ''} añadido al timeline desde ${startTime}s hasta ${endTime}s. Dimensiones: ${width}x${height}`);
     },
 
     changeDuration: (elementId: string, duration: number) => {

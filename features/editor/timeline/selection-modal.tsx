@@ -160,12 +160,24 @@ const SelectionModal: React.FC = () => {
         }
       }
 
-      // Determinar si estamos manejando un GIF o un video
-      const isGif = transitionPath.toLowerCase().endsWith('.gif');
+      // Para los archivos APNG, tratarlos como videos en vez de imágenes animadas
+      const isAPNG = transitionPath.toLowerCase().endsWith('.apng');
+      const isGIF = transitionPath.toLowerCase().endsWith('.gif');
 
-      if (isGif) {
+      if (isAPNG) {
+        // Tratar APNG como video para mantener su duración y comportamiento
+        await commandExecutor.addVideo(transitionPath, {
+          startTime,
+          endTime,
+          width: 1920,  // Ancho para cubrir el canvas completo
+          height: 1080, // Alto para cubrir el canvas completo
+          position: { x: 0.5, y: 0.5 } // Centrado en pantalla
+        });
+
+        console.log(`Transición APNG añadida como video a pantalla completa desde ${startTime}s hasta ${endTime}s`);
+      } else if (isGIF) {
         try {
-          // Necesitamos personalizar la implementación para asegurar que el GIF cubra todo el canvas
+          // Necesitamos personalizar la implementación para asegurar que la imagen animada cubra todo el canvas
           // Usando una forma alternativa para añadir la imagen que especifica directamente el modo "cover"
 
           // Crear payload para la imagen de transición
@@ -200,7 +212,7 @@ const SelectionModal: React.FC = () => {
 
           console.log(`Transición GIF añadida a pantalla completa con modo 'cover' desde ${startTime}s hasta ${endTime}s`);
         } catch (error) {
-          console.error("Error al aplicar transición GIF:", error);
+          console.error(`Error al aplicar transición animada:`, error);
           throw error;
         }
       } else {

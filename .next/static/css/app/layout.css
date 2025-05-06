@@ -2527,6 +2527,9 @@ video {
 .ease-in-out {
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+.paused {
+  animation-play-state: paused;
+}
 .masonry-sm {
     gap: 0.5rem;
     -moz-column-count: 2;

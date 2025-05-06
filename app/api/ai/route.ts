@@ -241,33 +241,73 @@ async function handleTimelineChat(
   applyTransitionDetection: any
 ): Promise<any> {
   try {
-    // Extraer el contenido relevante de los elementos seleccionados
-    const extractedContent = selectedItems.map(item => {
-      if (item.text) return item.text;
-      if (item.details?.text) return item.details.text;
-      if (item.name) return item.name;
-      if (item.content) return item.content;
-      if (typeof item === 'string') return item;
-      return JSON.stringify(item);
-    }).join('\n');
+    // Limitar la cantidad de elementos seleccionados para prevenir sobrecarga
+    const limitedItems = selectedItems.slice(0, 5); // Solo considerar hasta 5 elementos
+
+    // Función para sanear objetos complejos, eliminando campos innecesarios y limitando profundidad
+    const sanitizeObject = (obj: any, depth: number = 0, maxDepth: number = 3): any => {
+      if (depth >= maxDepth) return "[Objeto anidado]";
+      if (obj === null || obj === undefined) return obj;
+
+      // Para tipos primitivos, devolver directamente
+      if (typeof obj !== 'object') return obj;
+
+      // Para arrays, aplicar sanitización a cada elemento hasta cierto límite
+      if (Array.isArray(obj)) {
+        return obj.slice(0, 10).map(item => sanitizeObject(item, depth + 1, maxDepth));
+      }
+
+      // Para objetos, extraer solo campos esenciales
+      const result: any = {};
+      const essentialFields = [
+        'id', 'type', 'display', 'text', 'content', 'name', 'details',
+        'src', 'from', 'to', 'width', 'height'
+      ];
+
+      for (const field of essentialFields) {
+        if (field in obj) {
+          result[field] = sanitizeObject(obj[field], depth + 1, maxDepth);
+        }
+      }
+
+      return result;
+    };
+
+    // Sanear los elementos seleccionados
+    const sanitizedItems = limitedItems.map(item => sanitizeObject(item));
+
+    // Extraer el contenido relevante de los elementos seleccionados de manera segura
+    const extractedContent = sanitizedItems.map(item => {
+      try {
+        if (item.text) return String(item.text).slice(0, 100);
+        if (item.details?.text) return String(item.details.text).slice(0, 100);
+        if (item.name) return String(item.name).slice(0, 100);
+        if (item.content) return String(item.content).slice(0, 100);
+        if (typeof item === 'string') return item.slice(0, 100);
+        return JSON.stringify(sanitizeObject(item, 0, 2)).slice(0, 100);
+      } catch (err) {
+        console.error("Error al extraer contenido de item:", err);
+        return "[Error al procesar elemento]";
+      }
+    }).join('\n').slice(0, 500); // Limitar longitud total a 500 caracteres
+
+    // Limitar también selectedText
+    const limitedSelectedText = selectedText ? String(selectedText).slice(0, 300) : '';
 
     // Incluir información sobre las URLs detectadas en el mensaje del sistema
     let systemPrompt = "Eres un asistente de edición de video que ayuda a analizar y mejorar los elementos seleccionados en una timeline. Responde de manera concisa y útil.";
 
-    // Si hay URLs en el texto, añadir información sobre ellas
+    // Si hay URLs en el texto, añadir información sobre ellas (limitada)
     if (urlAnalysis && urlAnalysis.containsURLs) {
-      systemPrompt += `\n\nEl texto seleccionado contiene las siguientes URLs:\n${urlAnalysis.urls.join('\n')}\n\n`;
+      const limitedUrls = (urlAnalysis.urls || []).slice(0, 3).join('\n'); // Limitar a 3 URLs
+      systemPrompt += `\n\nEl texto seleccionado contiene URLs, incluyendo: ${limitedUrls}`;
 
-      // Informar que las capturas pueden ser aplicadas a la timeline
-      systemPrompt += "Hay capturas de pantalla disponibles de estas URLs. El usuario puede pedirte que apliques estas capturas directamente a la timeline del video o que se las muestres en el chat.";
+      // Informar que las capturas pueden ser aplicadas a la timeline (versión condensada)
+      systemPrompt += "\n\nHay capturas disponibles. El usuario puede pedir añadirlas a la timeline.";
 
-      // Añadir información adicional sobre la detección específica si existe
+      // Añadir información resumida sobre la detección
       if (showScreenshotDetection && showScreenshotDetection.detected) {
-        if (showScreenshotDetection.reason.includes("timeline")) {
-          systemPrompt += " El usuario parece interesado en aplicar estas capturas a la timeline, así que hazle saber que ya se han aplicado como elementos de imagen en la timeline del video.";
-        } else {
-          systemPrompt += " El usuario parece interesado en ver estas capturas, así que hazle saber que puede pedirte aplicarlas a la timeline escribiendo mensajes como 'aplica la captura a la timeline' o 'añade la imagen al video'.";
-        }
+        systemPrompt += " El usuario parece interesado en estas capturas.";
       }
     }
 
@@ -276,14 +316,22 @@ async function handleTimelineChat(
       systemPrompt += "\n\nEl usuario ha solicitado aplicar una transición a la timeline. Informa que la transición se ha aplicado correctamente en la timeline del video.";
     }
 
+    // Limitamos mensaje del usuario
+    const limitedMessage = message.slice(0, 200);
+
+    console.log("Longitud de systemPrompt:", systemPrompt.length);
+    console.log("Longitud de extractedContent:", extractedContent.length);
+    console.log("Longitud de limitedSelectedText:", limitedSelectedText.length);
+    console.log("Longitud de limitedMessage:", limitedMessage.length);
+
     const chatResponse = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini", // Usar un modelo más económico
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Elementos seleccionados:\n${extractedContent}\n\nTexto seleccionado: ${selectedText || extractedContent}\n\nMensaje del usuario: ${message}` }
+        { role: "user", content: `Elementos seleccionados:\n${extractedContent}\n\nTexto seleccionado: ${limitedSelectedText || extractedContent}\n\nMensaje del usuario: ${limitedMessage}` }
       ],
       temperature: 0.7,
-      max_tokens: 500
+      max_tokens: 300 // Reducir para ahorrar tokens
     });
 
     // Crear estructura con formato similar al de otras detecciones en la API
@@ -291,24 +339,23 @@ async function handleTimelineChat(
     let transitionData = null;
 
     if (urlAnalysis && urlAnalysis.containsURLs && showScreenshotDetection) {
-      // Usar un umbral mucho más bajo de confianza (0.2) para la detección
+      // Simplificar la detección de capturas
       screenshotData = {
         detected: showScreenshotDetection.detected && showScreenshotDetection.confidence > 0.2,
         confidence: showScreenshotDetection.confidence,
         reason: showScreenshotDetection.reason,
-        urls: urlAnalysis.urls,
-        screenshots: urlAnalysis.screenshots || []
+        urls: (urlAnalysis.urls || []).slice(0, 3), // Limitar a 3 URLs
+        screenshots: (urlAnalysis.screenshots || []).slice(0, 3) // Limitar a 3 capturas
       };
     }
 
     // Añadir información sobre transiciones detectadas
     if (applyTransitionDetection) {
-      // Usar el mismo umbral bajo de confianza (0.2) para la detección
       transitionData = {
         detected: applyTransitionDetection.detected && applyTransitionDetection.confidence > 0.2,
         confidence: applyTransitionDetection.confidence,
         reason: applyTransitionDetection.reason,
-        transitionPath: applyTransitionDetection.transitionPath || '/transitions/transition1.gif'
+        transitionPath: applyTransitionDetection.transitionPath || '/transitions/transition1.apng'
       };
     }
 
@@ -331,15 +378,21 @@ async function handleTimelineChat(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    console.log("Request body:", body);
+    console.log("Request body type:", body.type);
 
     // Verificar si es una solicitud del chat de la timeline
     if (body.type === 'timeline_chat') {
       const { message, selectedItems, selectedText, urlAnalysis, showScreenshotDetection, applyTransitionDetection } = body;
+      // Registrar el tamaño de los datos recibidos para diagnóstico
+      console.log("Tamaño de datos recibidos:");
+      console.log("- Mensaje:", message?.length || 0, "caracteres");
+      console.log("- Elementos seleccionados:", selectedItems?.length || 0, "elementos");
+      console.log("- Texto seleccionado:", selectedText?.length || 0, "caracteres");
+
       const response = await handleTimelineChat(
         message,
-        selectedItems,
-        selectedText,
+        selectedItems || [],
+        selectedText || "",
         urlAnalysis,
         showScreenshotDetection,
         applyTransitionDetection
@@ -358,9 +411,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Limitar la cantidad de mensajes históricos para reducir tokens
+    const limitedMessages = messages.slice(-10); // Solo mantener los últimos 10 mensajes
+
+    // Limitar el tamaño de cada mensaje
+    const processedMessages = limitedMessages.map(msg => {
+      if (typeof msg.content === 'string') {
+        return {
+          ...msg,
+          content: msg.content.slice(0, 500) // Limitar cada mensaje a 500 caracteres
+        };
+      }
+      return msg;
+    });
+
     // Extraer la URL de la imagen si está presente en el último mensaje
     let imageUrl = '';
-    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    const lastUserMessage = [...processedMessages].reverse().find(m => m.role === 'user');
     if (lastUserMessage && typeof lastUserMessage.content === 'string') {
       // Buscar URL de imagen explícita
       const imageMatch = lastUserMessage.content.match(/\[IMAGEN: (.*?)\]/);
@@ -370,8 +437,6 @@ export async function POST(req: NextRequest) {
 
       // O verificar si hay imagen adjunta (sin URL explícita)
       else if (lastUserMessage.content.includes('[IMAGEN_ADJUNTA]')) {
-        // Usamos un identificador especial para indicar que se debe usar la última imagen
-        // NO usar una URL relativa que causaría error 404
         imageUrl = 'imagen_adjunta_por_el_usuario.jpg';
       }
     }
@@ -401,80 +466,50 @@ export async function POST(req: NextRequest) {
       typeof lastUserMessage.content === 'string' &&
       (/compact[a|ar]|elimina[r]?\s+(los)?\s*espacios|optimiza[r]?|quita[r]?\s+(los)?\s*huecos|junta[r]?\s+(los)?\s*clips|comprim[e|ir]/i.test(lastUserMessage.content));
 
-    if (isCompactRequest) {
-      console.log("Se detectó posible solicitud de compactación del timeline");
-    }
-
     // Verificar si el usuario está solicitando un recorte inteligente
     const isSmartTrimRequest =
       lastUserMessage &&
       typeof lastUserMessage.content === 'string' &&
       (/recorte\s+inteligente|smart\s*trim|analiza\s+(?:y\s+)?recort[a|e]|recort[a|e]\s+(?:inteligentemente|automáticamente)|elimina\s+(?:partes|segmentos)\s+(?:innecesari[os|as]|redundantes)/i.test(lastUserMessage.content));
 
-    if (isSmartTrimRequest) {
-      console.log("Se detectó posible solicitud de recorte inteligente");
-    }
+    // Crear una versión reducida de las instrucciones del sistema
+    const compactSystemInstructions = `
+Eres un asistente especializado en edición de video. Tu tarea es detectar cuando los usuarios quieren:
+1. Agregar texto, imagen, video o subtítulos al timeline
+2. Eliminar segmentos de un elemento existente
+3. Compactar el timeline eliminando espacios vacíos
+4. Realizar recorte inteligente del video
 
-    // Añadir el mensaje del sistema al inicio para dar contexto
+Responde de manera breve y concisa. Si detectas una solicitud para agregar elementos o realizar acciones, incluye la información estructurada necesaria entre <element_data> y </element_data>.`;
+
+    // Añadir el mensaje del sistema al inicio para dar contexto, con versión reducida
     const conversationWithSystem = [
-      { role: 'system', content: systemInstructions },
-      ...messages,
+      { role: 'system', content: compactSystemInstructions },
+      ...processedMessages,
       {
         role: 'system',
         content: `
-        Después de responder al usuario, evalúa si están solicitando agregar un elemento al video o eliminar segmentos.
-        Si crees que están solicitando agregar un elemento o eliminar segmentos con una confianza mayor a 0.7, incluye una estructura JSON como esta al final de tu respuesta, entre los marcadores <element_data> y </element_data>:
-
-        <element_data>
-        {
-          "detected": true,
-          "confidence": [nivel de confianza entre 0 y 1],
-          "element": {
-            "type": ["text", "image", "video", "subtitles" o "segments"],
-            "content": "[solo para texto - el contenido del texto]",
-            "color": "[solo para texto - color en hex o nombre]",
-            "url": "[solo para imagen - URL de la imagen si se proporcionó]",
-            "startTime": [tiempo inicial en segundos, solo para text, image, video, subtitles],
-            "endTime": [tiempo final en segundos, solo para text, image, video, subtitles],
-            "segments": [solo para segments - array de objetos con startTime y endTime para cada segmento a eliminar]
-          },
-          "reasoning": "Explica detalladamente por qué has elegido este nivel de confianza y por qué has decidido que se debe insertar o no un elemento. Incluye los factores que consideraste y las palabras clave que detectaste en el mensaje del usuario."
-        }
-        </element_data>
-
-        Si no están solicitando agregar elementos o eliminar segmentos, o tu confianza es menor a 0.7, incluye:
-
-        <element_data>
-        {
-          "detected": false,
-          "confidence": [nivel de confianza entre 0 y 1],
-          "reasoning": "Explica detalladamente por qué has elegido este nivel de confianza y por qué has decidido que NO se debe insertar un elemento. Incluye los factores que consideraste y por qué el mensaje del usuario no constituye una solicitud clara de inserción."
-        }
-        </element_data>
-
-        ${imageUrl ? `IMPORTANTE: El usuario ha compartido una imagen con URL: ${imageUrl}.
-NO asumas automáticamente que quiere agregarla al video.
-Solo debes sugerir agregarla si el usuario lo indica explícitamente en su mensaje.
-Si el usuario no ha expresado claramente su intención de agregar la imagen, simplemente reconoce que la has visto y pregunta qué desea hacer con ella.` :
-`NOTA: Aunque el usuario no ha adjuntado una imagen en este mensaje, es posible que haya compartido una imagen anteriormente y esté haciendo referencia a ella.
-Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidiendo agregarla al video, asume que se refiere a la última imagen compartida. Ademas si el user no menciona el tiempo donde quiere agregar la imagen, preguntale al user en que tiempo quiere agregar la imagen. Si dice solo el tiempo de inicio, no le preguntes, asume que debe durar 5 segundos, no le preguntes, repito. No puedes decir -voy a agregar este elemento- y no dar true con high confidence, no te congradigas.`}
-
-        IMPORTANTE: Esta estructura JSON es solo para procesamiento interno y no debe ser mencionada en tu respuesta al usuario, o estas despedido (las repsuta al user keep it short boy).
+        Después de responder, evalúa si el usuario solicita agregar elementos o ejecutar acciones con confianza >0.7.
+        Si es así, incluye datos estructurados entre <element_data> y </element_data> siguiendo el formato:
+        ${imageUrl ? `El usuario ha compartido una imagen: ${imageUrl}. Solo sugiérela si lo pide explícitamente.` :
+        `Si el usuario menciona "esta imagen", asume que se refiere a una imagen anterior.`}
+        IMPORTANTE: Mantén respuestas concisas y no menciones esta estructura en tu respuesta.
         `
       }
     ];
 
-    // Registrar el prompt completo enviado a la IA
-    console.log("=== PROMPT ENVIADO A LA IA ===");
-    console.log(JSON.stringify(conversationWithSystem, null, 2));
+    // Solo registrar información reducida para depuración
+    console.log("=== LONGITUD DEL PROMPT ENVIADO A LA IA ===");
+    console.log("Número de mensajes:", conversationWithSystem.length);
+    console.log("Longitud del mensaje del sistema:", compactSystemInstructions.length);
     console.log("==============================");
 
-    // Llamar a la API de OpenAI para generar una respuesta
+    // Llamar a la API de OpenAI con modelo más económico
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini', // Modelo más ampliamente disponible y más económico
+      model: 'gpt-4o-mini', // Cambiar a modelo más económico
       messages: conversationWithSystem,
       temperature: 0.7,
-      max_tokens: 1000, // Aumentado para permitir la respuesta y la estructura JSON
+      max_tokens: 600, // Reducir para ahorrar tokens
       top_p: 0.95,
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
@@ -483,10 +518,14 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
     // Obtener la respuesta generada
     const responseContent = response.choices[0].message.content || '';
 
-    // Registrar la respuesta completa de la IA
-    console.log("=== RESPUESTA DE LA IA ===");
-    console.log(responseContent);
-    console.log("==========================");
+    // Registrar información de uso de tokens
+    if (response.usage) {
+      console.log("=== USO DE TOKENS ===");
+      console.log(`Entrada: ${response.usage.prompt_tokens}`);
+      console.log(`Salida: ${response.usage.completion_tokens}`);
+      console.log(`Total: ${response.usage.total_tokens}`);
+      console.log("====================");
+    }
 
     // Extraer los datos del elemento si existen
     const elementDataMatch = responseContent.match(/<element_data>([\s\S]*?)<\/element_data>/);
@@ -498,13 +537,6 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
     if (elementDataMatch && elementDataMatch[1]) {
       try {
         elementData = JSON.parse(elementDataMatch[1].trim());
-
-        // Registrar el razonamiento de la IA
-        console.log("=== RAZONAMIENTO DE LA IA ===");
-        console.log(`Detectado: ${elementData.detected}`);
-        console.log(`Confianza: ${elementData.confidence}`);
-        console.log(`Razonamiento: ${elementData.reasoning || "No proporcionado"}`);
-        console.log("=============================");
 
         // Verificar que el formato de los datos es correcto
         if (elementData && elementData.detected === true && elementData.element) {
@@ -524,50 +556,11 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
             elementData.element.url = imageUrl;
           }
 
-          // Si el elemento de imagen tiene la URL genérica y hay una última imagen válida, asegurarse de identificarlo
-          if (elementData.element.type === 'image' &&
-              elementData.element.url === 'imagen_adjunta_por_el_usuario.jpg' &&
-              !lastImageUrl) {
-            console.warn('Se detectó URL genérica de imagen pero no hay última imagen disponible');
-          }
-
           // Normalizar tipos de datos
           if (elementData.element.startTime)
             elementData.element.startTime = Number(elementData.element.startTime);
           if (elementData.element.endTime)
             elementData.element.endTime = Number(elementData.element.endTime);
-
-          // Añadir manejo para subtítulos
-          if (elementData.element.type === 'subtitles') {
-            // Normalizar valores
-            if (elementData.element.groupWords === undefined) {
-              elementData.element.groupWords = true; // Por defecto, agrupar palabras
-            }
-            if (elementData.element.startTime)
-              elementData.element.startTime = Number(elementData.element.startTime);
-            if (elementData.element.endTime)
-              elementData.element.endTime = Number(elementData.element.endTime);
-          }
-
-          // Añadir manejo para segmentos a eliminar
-          if (elementData.element.type === 'segments' && elementData.element.segments) {
-            // Asegurarse de que segments es un array
-            if (!Array.isArray(elementData.element.segments)) {
-              elementData.element.segments = [];
-            }
-
-            // Normalizar los valores de cada segmento
-            elementData.element.segments = elementData.element.segments.map(segment => ({
-              startTime: Number(segment.startTime),
-              endTime: Number(segment.endTime)
-            }));
-
-            // Verificar que hay al menos un segmento válido
-            if (elementData.element.segments.length === 0) {
-              console.warn('No se detectaron segmentos válidos para eliminar');
-              elementData.detected = false;
-            }
-          }
         }
 
         // Si hay una detección directa de solicitud de compactación pero la IA no la detectó
@@ -595,73 +588,18 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
             reasoning: "Detectado basado en el análisis de patrones de solicitud directa de recorte inteligente"
           };
         }
-
-        // Si hay una imagen compartida y no se detectó ningún elemento, no crear uno automáticamente
-        // a menos que el último mensaje del usuario tenga indicaciones claras
-        if (imageUrl && (!elementData || !elementData.detected)) {
-          // Verificar si el mensaje del usuario indica claramente que quiere agregar la imagen
-          const userWantsToAddImage = lastUserMessage && typeof lastUserMessage.content === 'string' && (
-            /agrega(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            /a(?:ñ|n)ade\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            /coloca(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            /pon(?:er)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            /usa(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            /inserta(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-            // Detectar cuando se hace referencia a una imagen previa
-            /agrega(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            /a(?:ñ|n)ade\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            /coloca(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            /pon(?:er)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            /usa(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            /inserta(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-            // Detectar menciones a "la imagen" cuando está claro que se quiere agregar
-            (/la\s+imagen/i.test(lastUserMessage.content) &&
-             (/agregar/i.test(lastUserMessage.content) ||
-              /añadir/i.test(lastUserMessage.content) ||
-              /colocar/i.test(lastUserMessage.content) ||
-              /poner/i.test(lastUserMessage.content) ||
-              /insertar/i.test(lastUserMessage.content)))
-          );
-
-          if (userWantsToAddImage && lastUserMessage && typeof lastUserMessage.content === 'string') {
-            // Solo si el usuario lo indica claramente, crear un elemento
-            const { startTime, endTime } = extractImageTimesFromMessage(lastUserMessage.content);
-
-            console.log(`Creando elemento de imagen con tiempos: startTime=${startTime}, endTime=${endTime}`);
-
-            elementData = {
-              detected: true,
-              confidence: 0.9,
-              element: {
-                type: "image",
-                url: imageUrl,
-                startTime: startTime,
-                endTime: endTime
-              }
-            };
-          } else {
-            // Si no hay indicación clara, no crear elemento
-            elementData = {
-              detected: false,
-              confidence: 0
-            };
-          }
-        }
       } catch (e) {
         console.error('Error parsing element data JSON:', e);
-
         // Si hay una imagen compartida, crear un elemento para ella a pesar del error
         if (imageUrl && lastUserMessage && typeof lastUserMessage.content === 'string') {
-          const { startTime, endTime } = extractImageTimesFromMessage(lastUserMessage.content);
-
           elementData = {
             detected: true,
             confidence: 0.9,
             element: {
               type: "image",
               url: imageUrl,
-              startTime: startTime,
-              endTime: endTime
+              startTime: 0,
+              endTime: 5
             }
           };
         } else {
@@ -673,54 +611,20 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
       }
     } else {
       // Si no se detectó ningún elemento pero hay una imagen, verificar si el usuario quiere agregarla
-      if (imageUrl) {
-        // Verificar si el mensaje del usuario indica claramente que quiere agregar la imagen
-        const userWantsToAddImage = lastUserMessage && typeof lastUserMessage.content === 'string' && (
-          /agrega(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          /a(?:ñ|n)ade\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          /coloca(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          /pon(?:er)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          /usa(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          /inserta(?:r)?\s+(esta|la|mi|una)\s+imagen/i.test(lastUserMessage.content) ||
-          // Detectar cuando se hace referencia a una imagen previa
-          /agrega(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          /a(?:ñ|n)ade\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          /coloca(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          /pon(?:er)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          /usa(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          /inserta(?:r)?\s+la\s+imagen\s+(?:anterior|previa|compartida|subida)/i.test(lastUserMessage.content) ||
-          // Detectar menciones a "la imagen" cuando está claro que se quiere agregar
-          (/la\s+imagen/i.test(lastUserMessage.content) &&
-           (/agregar/i.test(lastUserMessage.content) ||
-            /añadir/i.test(lastUserMessage.content) ||
-            /colocar/i.test(lastUserMessage.content) ||
-            /poner/i.test(lastUserMessage.content) ||
-            /insertar/i.test(lastUserMessage.content)))
-        );
+      if (imageUrl && lastUserMessage && typeof lastUserMessage.content === 'string' &&
+          (/agregar|añadir|colocar|poner|usar|insertar/i.test(lastUserMessage.content) &&
+           /imagen/i.test(lastUserMessage.content))) {
 
-        if (userWantsToAddImage && lastUserMessage && typeof lastUserMessage.content === 'string') {
-          // Solo si el usuario lo indica claramente, crear un elemento
-          const { startTime, endTime } = extractImageTimesFromMessage(lastUserMessage.content);
-
-          console.log(`Creando elemento de imagen con tiempos: startTime=${startTime}, endTime=${endTime}`);
-
-          elementData = {
-            detected: true,
-            confidence: 0.9,
-            element: {
-              type: "image",
-              url: imageUrl,
-              startTime: startTime,
-              endTime: endTime
-            }
-          };
-        } else {
-          // Si no hay indicación clara, no crear elemento
-          elementData = {
-            detected: false,
-            confidence: 0
-          };
-        }
+        elementData = {
+          detected: true,
+          confidence: 0.9,
+          element: {
+            type: "image",
+            url: imageUrl,
+            startTime: 0,
+            endTime: 5
+          }
+        };
       } else {
         elementData = {
           detected: false,
@@ -734,7 +638,8 @@ Si el usuario menciona "esta imagen", "la imagen" o algo similar, y está pidien
         role: 'assistant',
         content: cleanedResponse
       },
-      elementData: elementData
+      elementData: elementData,
+      usage: response.usage
     });
 
   } catch (error) {
