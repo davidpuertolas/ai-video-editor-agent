@@ -4,7 +4,7 @@ import { TIMELINE_SELECTION_MODAL } from './items/timeline';
 import AIService from '../services/ai-service';
 import CommandExecutorService from '../services/command-executor-service';
 import { generateId } from "@designcombo/timeline";
-import { ADD_IMAGE, ADD_VIDEO, ADD_TEXT } from "@designcombo/state";
+import { ADD_IMAGE, ADD_VIDEO, ADD_TEXT, ADD_ANIMATION } from "@designcombo/state";
 
 interface Position {
   x: number;
@@ -130,126 +130,170 @@ const SelectionModal: React.FC = () => {
   // Función para agregar una transición al video
   const applyTransition = async (transitionPath: string): Promise<{ success: boolean; details: string }> => {
     try {
-      // Calcular tiempos para la transición
-      // Por defecto, usar la duración del elemento seleccionado
-      let startTime = 0;
-      let endTime = 5;
+      console.log("=== APLICANDO TRANSICIÓN USANDO EFECTOS DE FADE ===");
 
-      // Obtener el CommandExecutor
-      const commandExecutor = CommandExecutorService.getExecutor();
-      if (!commandExecutor) {
-        console.error("CommandExecutor no disponible");
+      // Verificar si tenemos elementos seleccionados
+      if (!selectedItems || selectedItems.length === 0) {
         return {
           success: false,
-          details: "CommandExecutor no disponible"
+          details: "No hay elementos seleccionados para aplicar la transición"
         };
       }
 
-      // Lógica para determinar los tiempos según la selección
-      if (selectedItems && selectedItems.length > 0) {
-        if (selectedItems.length === 1) {
-          // Si solo hay un elemento seleccionado, aplicar fade out al final de ese elemento
-          const item = selectedItems[0];
-          if (item.display) {
-            startTime = (item.display.from || 0) / 1000; // convertir de ms a segundos
-            endTime = (item.display.to || (startTime * 1000 + 5000)) / 1000; // convertir de ms a segundos
-          }
-        } else if (selectedItems.length >= 2) {
-          // Si hay dos o más elementos, aplicar fade out al final del primer elemento
-          const firstItem = selectedItems[0];
-          if (firstItem.display) {
-            startTime = (firstItem.display.from || 0) / 1000;
-            endTime = (firstItem.display.to || (startTime * 1000 + 5000)) / 1000;
-          }
-        }
-      }
+      // Duración de los efectos en frames (30 frames = 1 segundo)
+      const fadeDuration = 30;
 
-      // AJUSTE: Duración fija de 3 segundos para el fade out, siempre al final
-      const clipDuration = endTime - startTime;
-      const fadeDuration = Math.min(3.0, clipDuration * 0.7); // 3 segundos o 70% del clip si es más corto
+      // Si hay exactamente dos elementos seleccionados
+      if (selectedItems.length === 2) {
+        console.log("Aplicando transición entre dos elementos: fade out al primero, fade in al segundo");
 
-      // Calcular el tiempo de inicio del fade out (3 segundos antes del final)
-      const fadeStart = endTime - fadeDuration;
+        // Primer elemento: aplicar fade out
+        const firstElement = selectedItems[1];
 
-      const imagePath = "/transitions/black.png"; // Ruta a la imagen negra
+        // Segundo elemento: aplicar fade in
+        const secondElement = selectedItems[0];
 
-      console.log(`Aplicando fade out con imagen ${imagePath} en los últimos ${fadeDuration.toFixed(2)}s del clip (desde ${fadeStart.toFixed(2)}s hasta ${endTime.toFixed(2)}s)`);
-
-      // NUEVO ENFOQUE: 20 capas que comienzan en diferentes momentos pero todas terminan al final
-      // y cada una con 5% más de opacidad que la anterior
-      const totalSteps = 20;  // Ahora con incrementos de 5%
-
-      // Calcular el incremento de tiempo entre el inicio de cada capa
-      const timeIncrement = fadeDuration / totalSteps;
-
-      // Helper function para añadir delay
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-      // Crear capas con opacidad progresiva usando async/await y delay
-      for (let i = 0; i < totalSteps; i++) {
-        // Añadir delay entre cada aplicación
-        await delay(100);
-
-        // Calcular tiempo de inicio para esta capa (escalonado)
-        // La primera capa comienza en fadeStart, las siguientes cada vez más tarde
-        const stepStart = fadeStart + (i * timeIncrement);
-
-        // Todas las capas terminan al mismo tiempo (al final del clip)
-        const stepEnd = endTime;
-
-        // Calcular opacidad progresiva (5%, 10%, 15%, ... 100%)
-        const opacity = (i + 1) * 5;
-
-        console.log(`Paso ${i+1}/${totalSteps}: Creando capa con opacidad ${opacity}% desde ${stepStart.toFixed(2)}s hasta ${stepEnd.toFixed(2)}s`);
-
-        // Crear un objeto imagen con la imagen negra con un ID único basado en el timestamp
-        const uniqueId = generateId() + '_fade_' + Date.now() + '_' + i;
-        const imagePayload = {
-          id: uniqueId,
-          display: {
-            from: stepStart * 1000, // Convertir a milisegundos
-            to: stepEnd * 1000      // Convertir a milisegundos (final del clip)
+        // Aplicar fade out al primer elemento
+        dispatch(ADD_ANIMATION, {
+          payload: {
+            id: firstElement.id,
+            animations: {
+              out: {
+                name: "fadeOut",
+                composition: [{
+                  property: "opacity",
+                  from: 1,
+                  to: 0,
+                  durationInFrames: fadeDuration, // 1 segundo
+                  ease: "easeInOut",
+                  name: "Fade Out",
+                  previewUrl: "https://cdn.designcombo.dev/animations/FadeOut.webp",
+                }],
+              },
+            },
           },
-          type: 'image',
-          details: {
-            src: imagePath,        // Imagen negra
-            width: 1600,           // Ancho completo
-            height: 900,          // Alto completo
-            opacity: opacity,      // Opacidad incremental en pasos de 5%
-            left: 0,             // Centrado
-            top: 0,              // Centrado
-            scaleMode: "cover",    // Cubrir toda la pantalla
-            originX: "center",     // Origen centrado
-            originY: "center",     // Origen centrado
-            zIndex: 1000 + i,      // Z-index incremental
-          }
-        };
-
-        // Usar dispatch para añadir la imagen y asegurar evento completo
-        console.log(`Dispatching imagen #${i+1} con ID: ${uniqueId} (${opacity}% opacidad)`);
-        dispatch(ADD_IMAGE, {
-          payload: imagePayload,
-          options: {
-            position: { x: 0.5, y: 0.5 },
-            scaleMode: "cover"
-          }
         });
 
-        // Log después de dispatch
-        console.log(`✓ Imagen #${i+1} añadida correctamente`);
+        // Aplicar fade in al segundo elemento
+        dispatch(ADD_ANIMATION, {
+          payload: {
+            id: secondElement.id,
+            animations: {
+              in: {
+                name: "fadeIn",
+                composition: [{
+                  property: "opacity",
+                  from: 0,
+                  to: 1,
+                  durationInFrames: fadeDuration, // 1 segundo
+                  ease: "easeInOut",
+                  name: "Fade In",
+                  previewUrl: "https://cdn.designcombo.dev/animations/FadeIn.webp",
+                }],
+              },
+            },
+          },
+        });
+
+        return {
+          success: true,
+          details: "Transición aplicada: Fade out de 1 segundo al primer elemento y fade in de 1 segundo al segundo elemento"
+        };
       }
+      // Si solo hay un elemento seleccionado
+      else if (selectedItems.length === 1) {
+        console.log("Solo hay un elemento seleccionado, aplicando fade out");
 
-      console.log(`✅ Fade out aplicado con ${totalSteps} capas superpuestas de imagen con opacidad progresiva del 5% al 100%`);
+        const element = selectedItems[0];
 
-      return {
-        success: true,
-        details: `Efecto de fade out aplicado en los últimos ${fadeDuration.toFixed(1)} segundos (con inicio escalonado)`
-      };
+        // Aplicar fade out al elemento
+        dispatch(ADD_ANIMATION, {
+          payload: {
+            id: element.id,
+            animations: {
+              out: {
+                name: "fadeOut",
+                composition: [{
+                  property: "opacity",
+                  from: 1,
+                  to: 0,
+                  durationInFrames: fadeDuration, // 1 segundo
+                  ease: "easeInOut",
+                  name: "Fade Out",
+                  previewUrl: "https://cdn.designcombo.dev/animations/FadeOut.webp",
+                }],
+              },
+            },
+          },
+        });
+
+        return {
+          success: true,
+          details: "Fade out de 1 segundo aplicado al elemento seleccionado"
+        };
+      }
+      // Si hay más de dos elementos seleccionados
+      else {
+        console.log("Hay más de dos elementos seleccionados, aplicando fade out al primero y fade in al último");
+
+        // Primer elemento: aplicar fade out
+        const firstElement = selectedItems[0];
+
+        // Último elemento: aplicar fade in
+        const lastElement = selectedItems[selectedItems.length - 1];
+
+        // Aplicar fade out al primer elemento
+        dispatch(ADD_ANIMATION, {
+          payload: {
+            id: firstElement.id,
+            animations: {
+              out: {
+                name: "fadeOut",
+                composition: [{
+                  property: "opacity",
+                  from: 1,
+                  to: 0,
+                  durationInFrames: fadeDuration, // 1 segundo
+                  ease: "easeInOut",
+                  name: "Fade Out",
+                  previewUrl: "https://cdn.designcombo.dev/animations/FadeOut.webp",
+                }],
+              },
+            },
+          },
+        });
+
+        // Aplicar fade in al último elemento
+        dispatch(ADD_ANIMATION, {
+          payload: {
+            id: lastElement.id,
+            animations: {
+              in: {
+                name: "fadeIn",
+                composition: [{
+                  property: "opacity",
+                  from: 0,
+                  to: 1,
+                  durationInFrames: fadeDuration, // 1 segundo
+                  ease: "easeInOut",
+                  name: "Fade In",
+                  previewUrl: "https://cdn.designcombo.dev/animations/FadeIn.webp",
+                }],
+              },
+            },
+          },
+        });
+
+        return {
+          success: true,
+          details: `Transición aplicada: Fade out al primer elemento y fade in al último elemento (${selectedItems.length} elementos seleccionados)`
+        };
+      }
     } catch (error) {
-      console.error("Error al añadir fade out:", error);
+      console.error("Error al aplicar transición:", error);
       return {
         success: false,
-        details: `Error al añadir fade out: ${error instanceof Error ? error.message : String(error)}`
+        details: `Error al aplicar transición: ${error instanceof Error ? error.message : String(error)}`
       };
     }
   };
@@ -787,7 +831,7 @@ const SelectionModal: React.FC = () => {
                 {actionSuccess === false
                   ? '❌'
                   : actionSuccess === true
-                    ? '✨'
+                    ? '✨ Accion ejecutada con exito'
                     : 'ℹ️'}
               </div>
               <div>{lastActionInfo.operationDetails}</div>

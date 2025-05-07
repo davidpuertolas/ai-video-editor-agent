@@ -51,7 +51,8 @@ const Player = () => {
       onMouseLeave={() => setIsHovering(false)}
       style={{
         zIndex: 150,
-        backgroundColor: "#000000" // Fondo negro para el contenedor del player
+        backgroundColor: "#000000", // Fondo negro para el contenedor del player
+        overflow: "hidden" // Asegura que el contenido no se desborde del contenedor
       }}
     >
       {/* Indicador de reproducción */}
@@ -70,7 +71,7 @@ const Player = () => {
         compositionHeight={size.height}
         className="h-full w-full"
         fps={30}
-        overflowVisible
+        overflowVisible={false} // Cambiado a false para evitar que se vea el contenido que se sale
         style={{
           // Añadir un sutil efecto de brillo al borde durante la reproducción
           boxShadow: isPlaying
@@ -79,7 +80,8 @@ const Player = () => {
           transition: 'box-shadow 0.3s ease-in-out',
           position: 'relative',
           zIndex: 200,
-          backgroundColor: "#000000" // Fondo negro para el player
+          backgroundColor: "#000000", // Fondo negro para el player
+          overflow: "hidden" // Añadido para recortar el contenido
         }}
       />
 
