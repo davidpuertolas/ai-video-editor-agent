@@ -16,6 +16,8 @@ import BasicCaption from "../control-item/basic-caption";
 import useStore from "../store/use-store";
 import useLayoutStore from "../store/use-layout-store";
 import { Sliders } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion, AnimatePresence } from "framer-motion";
 
 const AttributeEditorContainer = ({ children }: { children: React.ReactNode }) => {
   const { activeIds, trackItemsMap, trackItemDetailsMap, transitionsMap } = useStore();
@@ -70,16 +72,29 @@ const AttributeEditorContainer = ({ children }: { children: React.ReactNode }) =
   console.log("[DEBUG AttributeEditor] Renderizando editor para tipo:", trackItem.type);
 
   return (
-    <div className="flex w-full flex-col">
+    <div className="flex w-full flex-col h-full">
       <div className="border-b border-border/80 p-3">
         <div className="flex items-center gap-2 text-primary font-medium">
           <Sliders size={16} />
           <span>Editor de Atributos - {getItemTypeTitle(trackItem.type)}</span>
         </div>
       </div>
-      {React.cloneElement(children as React.ReactElement<any>, {
-        trackItem,
-      })}
+      <ScrollArea className="flex-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={trackItem.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="p-3"
+          >
+            {React.cloneElement(children as React.ReactElement<any>, {
+              trackItem,
+            })}
+          </motion.div>
+        </AnimatePresence>
+      </ScrollArea>
     </div>
   );
 };

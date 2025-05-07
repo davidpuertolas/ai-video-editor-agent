@@ -333,7 +333,7 @@ export class AIService {
           detected: true,
           confidence: item.confidence,
           reason: item.description,
-          transitionPath: '/transitions/transition1.apng' // Path predeterminado para la transición
+          transitionPath: '/transitions/fade-out.apng' // Path actualizado para la transición
         };
       }
     }

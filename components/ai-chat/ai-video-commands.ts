@@ -34,6 +34,9 @@ interface ImageOptions {
   position?: { x: number; y: number };
   startTime?: number; // en segundos
   endTime?: number; // en segundos
+  isAnimated?: boolean;
+  isStatic?: boolean; // Para forzar tratar una imagen animada como estática
+  scaleMode?: string;
 }
 
 interface VideoOptions {
@@ -42,6 +45,10 @@ interface VideoOptions {
   position?: { x: number; y: number };
   startTime?: number; // en segundos
   endTime?: number; // en segundos
+  scaleMode?: string;
+  isAPNG?: boolean;
+  syncWithTimeline?: boolean;
+  playbackBehavior?: string;
 }
 
 interface SubtitleOptions {
@@ -116,11 +123,16 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
     },
 
     addImage: (url: string, options?: ImageOptions) => {
+      try {
       // Asegurar que tenemos una URL válida
       if (!url) {
-        console.error("URL de imagen no válida");
-        return;
+          console.error("❌ URL de imagen no válida o vacía");
+          throw new Error("URL de imagen no proporcionada");
       }
+
+        console.log("=== INICIANDO PROCESO DE AÑADIR IMAGEN ===");
+        console.log("URL:", url);
+        console.log("Opciones:", JSON.stringify(options, null, 2));
 
       // Verificar si es una URL genérica de referencia, que no debe usarse directamente
       if (url === 'imagen_adjunta_por_el_usuario.jpg' || url.includes('/url_de_la_imagen')) {
@@ -133,116 +145,214 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
       const startTime = options?.startTime !== undefined ? options.startTime : 0;
       const endTime = options?.endTime !== undefined ? options.endTime : startTime + 5;
 
+        // Detectores de tipo de imagen
+        const isExplicitlyAnimated = options?.isAnimated === true;
+        const isExplicitlyStatic = options?.isStatic === true;
+        const isAPNG = url.toLowerCase().endsWith('.apng');
+        const isGIF = url.toLowerCase().endsWith('.gif');
+
+        // Determinar si debe tratarse como imagen animada
+        const shouldTreatAsAnimated = (isExplicitlyAnimated || isAPNG || isGIF) && !isExplicitlyStatic;
+
+        // Log de modo detectado
+        if (shouldTreatAsAnimated) {
+          console.log(`🔶 Detectada imagen animada: ${url}`);
+          console.log(`Tipo: ${isAPNG ? 'APNG' : isGIF ? 'GIF' : 'Animada genérica'}`);
+        } else if (isAPNG || isGIF) {
+          console.log(`🔹 Detectada imagen potencialmente animada pero tratándola como estática: ${url}`);
+        } else {
+          console.log(`🔷 Detectada imagen estática: ${url}`);
+        }
+
       // Para depuración, mostrar parte de la URL (truncada si es data:URL)
       const logUrl = url.startsWith('data:')
         ? `${url.substring(0, 30)}... (data URL)`
         : url;
       console.log(`Añadiendo imagen desde ${logUrl} desde segundo ${startTime} hasta ${endTime}`);
 
-      // Pre-cargar la imagen para obtener sus dimensiones reales
-      const preloadImage = (imageUrl: string): Promise<{ width: number, height: number }> => {
-        return new Promise((resolve) => {
-          if (imageUrl.startsWith('data:')) {
-            // Para data URLs, creamos una imagen temporal
-            const img = new Image();
-            img.onload = () => {
-              resolve({ width: img.width, height: img.height });
-            };
-            img.onerror = () => {
-              console.warn("Error al cargar la imagen para dimensiones, usando valores por defecto");
-              resolve({ width: 480, height: 270 });
-            };
-            img.src = imageUrl;
-          } else {
-            // Para URLs normales, usamos dimensiones predeterminadas
-            resolve({ width: 480, height: 270 });
+        // Posición (centrada por defecto)
+        const position = options?.position || { x: 0.5, y: 0.5 };
+
+        // Modos de escala
+        const scaleMode = options?.scaleMode || "fit";
+        const useFullScreen = scaleMode === "cover";
+
+        // Propiedades para el payload, común para ambos casos
+        const commonPayloadProps = {
+          from: startTime * 1000,
+          to: endTime * 1000
+        };
+
+        // Propiedades de detalle comunes
+        const commonDetailsProps = {
+          src: url,
+          width: width,
+          height: height,
+          opacity: 100,
+          scaleMode: scaleMode,
+          left: position.x,
+          top: position.y,
+          originX: "center",
+          originY: "center"
+        };
+
+        // Crear ID único
+        const imageId = generateId();
+
+        // Crear el payload de imagen simplificado
+        const imagePayload = {
+          id: imageId,
+          display: commonPayloadProps,
+          type: 'image',
+          details: {
+            ...commonDetailsProps,
+            // Si es animada, añadir atributos específicos
+            ...(shouldTreatAsAnimated && {
+              isAnimated: true,
+            }),
+            // Si a pantalla completa, ajustar dimensiones
+            ...(useFullScreen && {
+              width: 1920,
+              height: 1080
+            })
           }
+        };
+
+        console.log("Payload de imagen a despachar:", JSON.stringify({
+          ...imagePayload,
+          details: {
+            ...imagePayload.details,
+            src: imagePayload.details.src.substring(0, 30) + (imagePayload.details.src.length > 30 ? '...' : '')
+          }
+        }, null, 2));
+
+        // Opciones para el dispatch
+        const dispatchOptions = {
+          scaleMode: scaleMode,
+          position: position,
+        };
+
+        // Despachar la acción para añadir la imagen
+        dispatch(ADD_IMAGE, {
+          payload: imagePayload,
+          options: dispatchOptions
         });
-      };
 
-      // Función para crear el payload después de pre-cargar la imagen
-      const createAndDispatchPayload = async () => {
-        try {
-          // Obtener dimensiones reales si es una data URL
-          let finalWidth = width;
-          let finalHeight = height;
-
-          if (url.startsWith('data:')) {
-            const dimensions = await preloadImage(url);
-
-            // Calcular proporciones para mantener relación de aspecto
-            const aspectRatio = dimensions.width / dimensions.height;
-
-            // Ajustar dimensiones manteniendo proporción
-            if (aspectRatio > 1) { // Imagen horizontal
-              finalWidth = Math.min(640, dimensions.width);
-              finalHeight = finalWidth / aspectRatio;
-            } else { // Imagen vertical o cuadrada
-              finalHeight = Math.min(480, dimensions.height);
-              finalWidth = finalHeight * aspectRatio;
-            }
-
-            console.log(`Dimensiones originales: ${dimensions.width}x${dimensions.height}, Ajustadas: ${finalWidth}x${finalHeight}`);
-          }
-
-          // Obtener posición (centrada por defecto)
-          const position = options?.position || { x: 0.5, y: 0.5 };
-
-          // Crear payload para la imagen con dimensiones ajustadas
-          const imagePayload = {
-            id: generateId(),
-            display: {
-              from: startTime * 1000, // Convertir a milisegundos
-              to: endTime * 1000     // Convertir a milisegundos
-            },
-            type: 'image',
-            details: {
-              src: url,
-              width: finalWidth,
-              height: finalHeight,
-              opacity: 100,
-              scaleMode: "fit", // Asegurar que la imagen se escale manteniendo proporciones
-              left: position.x, // Posición horizontal (0-1)
-              top: position.y,  // Posición vertical (0-1)
-              originX: "center", // Punto de origen horizontal
-              originY: "center", // Punto de origen vertical
-            },
-          };
-
-          // Agregar imagen al timeline
-          dispatch(ADD_IMAGE, {
-            payload: imagePayload,
-            options: {
-              scaleMode: "fit", // También configuramos aquí para asegurar
-              position: position, // Aseguramos que la posición se transfiere
-            },
-          });
-          console.log(`Imagen agregada correctamente al timeline en posición (${position.x}, ${position.y})`);
-        } catch (error) {
-          console.error("Error al agregar imagen al timeline:", error);
-          throw new Error(`Error al agregar imagen: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        // Log de éxito
+        if (shouldTreatAsAnimated) {
+          console.log(`✅ Imagen animada añadida desde ${startTime}s hasta ${endTime}s`);
+        } else {
+          console.log(`✅ Imagen estática añadida desde ${startTime}s hasta ${endTime}s`);
         }
-      };
 
-      // Iniciar el proceso
-      createAndDispatchPayload();
+      } catch (error) {
+        console.error("❌ ERROR CRÍTICO al añadir imagen:", error);
+        console.error("Detalles completos:", error.message);
+        console.error("Traza:", error.stack);
+        throw error; // Propagar el error para manejo superior
+      }
     },
 
     addVideo: (url: string, options?: VideoOptions) => {
-      const width = options?.width || 640;
-      const height = options?.height || 360;
-      const startTime = options?.startTime || 0; // Por defecto al inicio
-      const endTime = options?.endTime || 10; // Por defecto 10 segundos de duración
+      try {
+        console.log("=== INICIANDO PROCESO DE AÑADIR VIDEO ===");
+        console.log("URL:", url);
+        console.log("Opciones:", JSON.stringify(options, null, 2));
 
-      // Detectar si es un archivo APNG para tratamiento especial
-      const isAPNG = url.toLowerCase().endsWith('.apng');
+        // Validación de URL
+        if (!url) {
+          console.error("❌ URL de video no válida o vacía");
+          throw new Error("URL de video no proporcionada");
+        }
+
+        const width = options?.width || 640;
+        const height = options?.height || 360;
+        const startTime = options?.startTime || 0; // Por defecto al inicio
+        const endTime = options?.endTime || 10; // Por defecto 10 segundos de duración
+
+        // Detectar si es un archivo AVI o APNG para tratamiento especial
+        const isAVI = url.toLowerCase().endsWith('.avi');
+        const isAPNG = url.toLowerCase().endsWith('.apng');
+        // Marcador pasado explícitamente - mayor prioridad que la extensión
+        const isExplicitAPNG = options?.isAPNG === true;
+
+        console.log("Formato detectado:",
+          isAVI ? "AVI" : isAPNG ? "APNG" : isExplicitAPNG ? "Explícitamente marcado como APNG" : "Formato estándar");
+
+        // Si es APNG según algún criterio
+        const treatAsAPNG = isAPNG || isExplicitAPNG;
+        const useFullScreen = isAVI || treatAsAPNG || (options?.scaleMode === "cover");
+
+        // Para archivos AVI y APNG, respectar duración natural si no se especifica
+        const respectNativeDuration = (isAVI || treatAsAPNG) && !options?.endTime;
+        const finalEndTime = respectNativeDuration ? undefined : endTime;
+
+        // Log para depurar
+        if (treatAsAPNG) {
+          console.log(`🔷 Añadiendo APNG como VIDEO sincronizado desde ${startTime}s con duración ${respectNativeDuration ? 'natural' : finalEndTime + 's'}`);
+          console.log(`🔷 Configuraciones especiales de APNG - useFullScreen: ${useFullScreen}, syncWithTimeline: ${options?.syncWithTimeline || true}`);
+        } else if (isAVI) {
+          console.log(`🎬 Añadiendo AVI con duración ${respectNativeDuration ? 'natural' : 'especificada: ' + finalEndTime}s`);
+        }
+
+        // Manejar APNG usando un enfoque especial - intentar con un método alternativo si es posible
+        if (treatAsAPNG) {
+          try {
+            // Intentar crear un payload especial para APNG que funcione como animación
+            console.log("Probando con una configuración especial para APNG...");
+
+            // Configuración de opciones importante para archivos APNG
+            const apngVideoPayload = {
+            id: generateId(),
+            display: {
+              from: startTime * 1000, // Convertir a milisegundos
+                to: finalEndTime ? finalEndTime * 1000 : (startTime + 3) * 1000 // 3 segundos por defecto si no hay duración
+            },
+              // Probamos una nueva estrategia: tratarlo como imagen en lugar de video
+            type: 'image',
+            details: {
+              src: url,
+                width: 1920, // Ancho para pantalla completa
+                height: 1080, // Alto para pantalla completa
+              opacity: 100,
+                scaleMode: "cover", // Para llenar toda la pantalla
+                left: 0.5, // Centrado horizontalmente
+                top: 0.5,  // Centrado verticalmente
+                originX: "center", // Origen en el centro
+                originY: "center", // Origen en el centro
+                // Propiedades para animar
+                isAnimated: true
+              },
+            };
+
+            console.log("Payload para APNG como imagen animada:", JSON.stringify(apngVideoPayload, null, 2));
+
+            // Usar ADD_IMAGE en lugar de ADD_VIDEO
+          dispatch(ADD_IMAGE, {
+              payload: apngVideoPayload,
+            options: {
+                scaleMode: "cover",
+                position: { x: 0.5, y: 0.5 }
+            },
+          });
+
+            console.log("✅ APNG añadido como imagen animada con éxito");
+            return;
+          } catch (apngError) {
+            console.error("❌ Error al añadir APNG como imagen animada:", apngError);
+            console.error("Detalles:", apngError.message);
+            console.error("Traza:", apngError.stack);
+            console.log("🔄 Continuando con el método estándar como respaldo...");
+            // Continuar con el método estándar como respaldo
+          }
+        }
 
       // Crear payload para el video
       const videoPayload = {
         id: generateId(),
         display: {
           from: startTime * 1000, // Convertir a milisegundos
-          to: endTime * 1000     // Convertir a milisegundos
+            to: finalEndTime ? finalEndTime * 1000 : undefined // Usar undefined si queremos respetar la duración natural
         },
         type: 'video',
         details: {
@@ -250,30 +360,62 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
           width: width,
           height: height,
           opacity: 100,
-          // Para APNG, añadir propiedades adicionales para posicionamiento a pantalla completa
-          ...(isAPNG && {
-            scaleMode: "cover", // Usar "cover" en lugar de "fit" para asegurar que cubra todo
-            left: 0.5, // Centrado horizontalmente
-            top: 0.5,  // Centrado verticalmente
-            originX: "center", // Origen en el centro
-            originY: "center", // Origen en el centro
+            // Para archivos APNG y AVI, configurar propiedades específicas para pantalla completa
+            ...(useFullScreen && {
+              scaleMode: "cover", // Usar "cover" en lugar de "fit" para asegurar que cubra todo
+              left: 0.5, // Centrado horizontalmente
+              top: 0.5,  // Centrado verticalmente
+              originX: "center", // Origen en el centro
+              originY: "center", // Origen en el centro
+            }),
+            // Propiedades especiales para APNG
+            ...(treatAsAPNG && {
+              isAPNG: true,
+              autoPlay: true,
+              loop: false,
+              syncWithTimeline: options?.syncWithTimeline || true
+            })
+          },
+        };
+
+        console.log("Payload de video estándar:", JSON.stringify(videoPayload, null, 2));
+
+        // Configuraciones adicionales para el dispatch
+        const dispatchOptions = {
+          resourceId: "main",
+          scaleMode: useFullScreen ? "cover" : "fit", // Usar cover para pantalla completa, fit para otros videos
+          ...(useFullScreen && {
+            position: { x: 0.5, y: 0.5 } // Centrar para videos a pantalla completa
+          }),
+          respectNativeDuration: respectNativeDuration,
+          // Propiedades específicas para sincronización de APNG
+          ...(treatAsAPNG && {
+            isAPNG: true,
+            syncWithTimeline: options?.syncWithTimeline || true,
+            playbackBehavior: options?.playbackBehavior || "sync"
           })
-        },
-      };
+        };
+
+        console.log("Opciones de dispatch:", JSON.stringify(dispatchOptions, null, 2));
 
       // Agregar video al timeline
       dispatch(ADD_VIDEO, {
         payload: videoPayload,
-        options: {
-          resourceId: "main",
-          scaleMode: isAPNG ? "cover" : "fit", // Usar cover para APNG, fit para otros videos
-          ...(isAPNG && {
-            position: { x: 0.5, y: 0.5 } // Centrar para APNG
-          })
-        },
-      });
+          options: dispatchOptions,
+        });
 
-      console.log(`Video ${isAPNG ? 'APNG' : ''} añadido al timeline desde ${startTime}s hasta ${endTime}s. Dimensiones: ${width}x${height}`);
+        // Mensaje de log adaptado al tipo de archivo
+        if (treatAsAPNG) {
+          console.log(`✅ Transición APNG añadida como VIDEO SINCRONIZADO al timeline desde ${startTime}s ${finalEndTime ? `hasta ${finalEndTime}s` : 'con duración natural'}. Dimensiones: ${width}x${height}`);
+        } else {
+          console.log(`✅ Video ${isAVI ? 'AVI' : ''} añadido al timeline desde ${startTime}s${finalEndTime ? ` hasta ${finalEndTime}s` : ' con duración natural'}. Dimensiones: ${width}x${height}`);
+        }
+      } catch (error) {
+        console.error("❌ ERROR CRÍTICO al añadir video:", error);
+        console.error("Detalles completos:", error.message);
+        console.error("Traza:", error.stack);
+        throw error; // Propagar el error para manejo superior
+      }
     },
 
     changeDuration: (elementId: string, duration: number) => {

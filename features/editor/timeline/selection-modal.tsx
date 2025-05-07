@@ -4,7 +4,7 @@ import { TIMELINE_SELECTION_MODAL } from './items/timeline';
 import AIService from '../services/ai-service';
 import CommandExecutorService from '../services/command-executor-service';
 import { generateId } from "@designcombo/timeline";
-import { ADD_IMAGE, ADD_VIDEO } from "@designcombo/state";
+import { ADD_IMAGE, ADD_VIDEO, ADD_TEXT } from "@designcombo/state";
 
 interface Position {
   x: number;
@@ -72,9 +72,6 @@ const SelectionModal: React.FC = () => {
 
   // Estado para rastrear imágenes añadidas a la timeline
   const [addedScreenshots, setAddedScreenshots] = useState<{url: string, screenshotPath: string}[]>([]);
-
-  // Estado para rastrear transiciones añadidas a la timeline
-  const [addedTransitions, setAddedTransitions] = useState<string[]>([]);
 
   useEffect(() => {
     // Suscribirse al evento de selección por arrastre
@@ -148,95 +145,111 @@ const SelectionModal: React.FC = () => {
         };
       }
 
-      // Si hay elementos seleccionados, usar sus tiempos
+      // Lógica para determinar los tiempos según la selección
       if (selectedItems && selectedItems.length > 0) {
-        // Obtener el primer elemento seleccionado
-        const firstItem = selectedItems[0];
-
-        // Intentar obtener los tiempos del elemento
-        if (firstItem.display) {
-          startTime = (firstItem.display.from || 0) / 1000; // convertir de ms a segundos
-          endTime = (firstItem.display.to || (startTime * 1000 + 5000)) / 1000; // convertir de ms a segundos
+        if (selectedItems.length === 1) {
+          // Si solo hay un elemento seleccionado, aplicar fade out al final de ese elemento
+          const item = selectedItems[0];
+          if (item.display) {
+            startTime = (item.display.from || 0) / 1000; // convertir de ms a segundos
+            endTime = (item.display.to || (startTime * 1000 + 5000)) / 1000; // convertir de ms a segundos
+          }
+        } else if (selectedItems.length >= 2) {
+          // Si hay dos o más elementos, aplicar fade out al final del primer elemento
+          const firstItem = selectedItems[0];
+          if (firstItem.display) {
+            startTime = (firstItem.display.from || 0) / 1000;
+            endTime = (firstItem.display.to || (startTime * 1000 + 5000)) / 1000;
+          }
         }
       }
 
-      // Para los archivos APNG, tratarlos como videos en vez de imágenes animadas
-      const isAPNG = transitionPath.toLowerCase().endsWith('.apng');
-      const isGIF = transitionPath.toLowerCase().endsWith('.gif');
+      // AJUSTE: Duración fija de 3 segundos para el fade out, siempre al final
+      const clipDuration = endTime - startTime;
+      const fadeDuration = Math.min(3.0, clipDuration * 0.7); // 3 segundos o 70% del clip si es más corto
 
-      if (isAPNG) {
-        // Tratar APNG como video para mantener su duración y comportamiento
-        await commandExecutor.addVideo(transitionPath, {
-          startTime,
-          endTime,
-          width: 1920,  // Ancho para cubrir el canvas completo
-          height: 1080, // Alto para cubrir el canvas completo
-          position: { x: 0.5, y: 0.5 } // Centrado en pantalla
+      // Calcular el tiempo de inicio del fade out (3 segundos antes del final)
+      const fadeStart = endTime - fadeDuration;
+
+      const imagePath = "/transitions/black.png"; // Ruta a la imagen negra
+
+      console.log(`Aplicando fade out con imagen ${imagePath} en los últimos ${fadeDuration.toFixed(2)}s del clip (desde ${fadeStart.toFixed(2)}s hasta ${endTime.toFixed(2)}s)`);
+
+      // NUEVO ENFOQUE: 20 capas que comienzan en diferentes momentos pero todas terminan al final
+      // y cada una con 5% más de opacidad que la anterior
+      const totalSteps = 20;  // Ahora con incrementos de 5%
+
+      // Calcular el incremento de tiempo entre el inicio de cada capa
+      const timeIncrement = fadeDuration / totalSteps;
+
+      // Helper function para añadir delay
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      // Crear capas con opacidad progresiva usando async/await y delay
+      for (let i = 0; i < totalSteps; i++) {
+        // Añadir delay entre cada aplicación
+        await delay(100);
+
+        // Calcular tiempo de inicio para esta capa (escalonado)
+        // La primera capa comienza en fadeStart, las siguientes cada vez más tarde
+        const stepStart = fadeStart + (i * timeIncrement);
+
+        // Todas las capas terminan al mismo tiempo (al final del clip)
+        const stepEnd = endTime;
+
+        // Calcular opacidad progresiva (5%, 10%, 15%, ... 100%)
+        const opacity = (i + 1) * 5;
+
+        console.log(`Paso ${i+1}/${totalSteps}: Creando capa con opacidad ${opacity}% desde ${stepStart.toFixed(2)}s hasta ${stepEnd.toFixed(2)}s`);
+
+        // Crear un objeto imagen con la imagen negra con un ID único basado en el timestamp
+        const uniqueId = generateId() + '_fade_' + Date.now() + '_' + i;
+        const imagePayload = {
+          id: uniqueId,
+          display: {
+            from: stepStart * 1000, // Convertir a milisegundos
+            to: stepEnd * 1000      // Convertir a milisegundos (final del clip)
+          },
+          type: 'image',
+          details: {
+            src: imagePath,        // Imagen negra
+            width: 1600,           // Ancho completo
+            height: 900,          // Alto completo
+            opacity: opacity,      // Opacidad incremental en pasos de 5%
+            left: 0,             // Centrado
+            top: 0,              // Centrado
+            scaleMode: "cover",    // Cubrir toda la pantalla
+            originX: "center",     // Origen centrado
+            originY: "center",     // Origen centrado
+            zIndex: 1000 + i,      // Z-index incremental
+          }
+        };
+
+        // Usar dispatch para añadir la imagen y asegurar evento completo
+        console.log(`Dispatching imagen #${i+1} con ID: ${uniqueId} (${opacity}% opacidad)`);
+        dispatch(ADD_IMAGE, {
+          payload: imagePayload,
+          options: {
+            position: { x: 0.5, y: 0.5 },
+            scaleMode: "cover"
+          }
         });
 
-        console.log(`Transición APNG añadida como video a pantalla completa desde ${startTime}s hasta ${endTime}s`);
-      } else if (isGIF) {
-        try {
-          // Necesitamos personalizar la implementación para asegurar que la imagen animada cubra todo el canvas
-          // Usando una forma alternativa para añadir la imagen que especifica directamente el modo "cover"
-
-          // Crear payload para la imagen de transición
-          const transitionPayload = {
-            id: generateId(),
-            display: {
-              from: startTime * 1000, // Convertir a milisegundos
-              to: endTime * 1000     // Convertir a milisegundos
-            },
-            type: 'image',
-            details: {
-              src: transitionPath,
-              width: 1920, // Usar dimensión ancha
-              height: 1080, // Usar dimensión alta
-              opacity: 100,
-              scaleMode: "cover", // Usar "cover" en lugar de "fit" para asegurar que cubra todo
-              left: 0.5, // Centrado horizontalmente
-              top: 0.5,  // Centrado verticalmente
-              originX: "center", // Origen en el centro
-              originY: "center", // Origen en el centro
-            },
-          };
-
-          // Usar dispatch directamente para tener más control sobre las opciones
-          dispatch(ADD_IMAGE, {
-            payload: transitionPayload,
-            options: {
-              scaleMode: "cover", // Asegurar modo cover también en las opciones
-              position: { x: 0.5, y: 0.5 }, // Centrar
-            },
-          });
-
-          console.log(`Transición GIF añadida a pantalla completa con modo 'cover' desde ${startTime}s hasta ${endTime}s`);
-        } catch (error) {
-          console.error(`Error al aplicar transición animada:`, error);
-          throw error;
-        }
-      } else {
-        // Para videos (MP4, etc.), seguimos usando addVideo
-        await commandExecutor.addVideo(transitionPath, {
-          startTime,
-          endTime
-        });
-
-        console.log(`Transición de video añadida desde ${startTime}s hasta ${endTime}s`);
+        // Log después de dispatch
+        console.log(`✓ Imagen #${i+1} añadida correctamente`);
       }
 
-      // Registrar la transición añadida
-      setAddedTransitions(prev => [...prev, transitionPath]);
+      console.log(`✅ Fade out aplicado con ${totalSteps} capas superpuestas de imagen con opacidad progresiva del 5% al 100%`);
 
       return {
         success: true,
-        details: `Transición aplicada desde ${startTime.toFixed(1)}s hasta ${endTime.toFixed(1)}s`
+        details: `Efecto de fade out aplicado en los últimos ${fadeDuration.toFixed(1)} segundos (con inicio escalonado)`
       };
     } catch (error) {
-      console.error("Error al añadir transición:", error);
+      console.error("Error al añadir fade out:", error);
       return {
         success: false,
-        details: `Error al añadir transición: ${error instanceof Error ? error.message : String(error)}`
+        details: `Error al añadir fade out: ${error instanceof Error ? error.message : String(error)}`
       };
     }
   };
@@ -260,11 +273,15 @@ const SelectionModal: React.FC = () => {
     setActionSuccess(null);
 
     try {
+      console.log("=== INICIANDO ENVÍO DE COMANDO ===");
+
       // Enviar el mensaje a la API
       const response = await AIService.sendChatMessage({
         message: chatInput,
         selectedItems: selectedItems
       });
+
+      console.log("Respuesta recibida de la API:", response);
 
       if (response.success && response.response) {
         let actionSuccessful = true; // Por defecto asumimos éxito
@@ -274,6 +291,7 @@ const SelectionModal: React.FC = () => {
         let startTime = 0;
         let endTime = 5;
         let actionDetected = false;
+        let errorDetails = null;
 
         // Verificar si debemos aplicar una transición
         if (response.applyTransitionDetection?.detected &&
@@ -281,19 +299,36 @@ const SelectionModal: React.FC = () => {
             response.applyTransitionDetection.transitionPath) {
 
           actionDetected = true;
+          const transitionPath = response.applyTransitionDetection.transitionPath;
 
-          // Aplicar la transición
-          const transitionResult = await applyTransition(response.applyTransitionDetection.transitionPath);
+          console.log("Aplicando transición:", transitionPath);
 
-          actionSuccessful = transitionResult.success;
-          operationDetails = transitionResult.details;
+          try {
+            // Aplicar la transición de desvanecimiento
+            const transitionResult = await applyTransition(transitionPath);
 
-          // Detalles de la detección para referenciar
-          detectionInfo = {
-            detected: response.applyTransitionDetection.detected,
-            confidence: response.applyTransitionDetection.confidence,
-            reason: response.applyTransitionDetection.reason
-          };
+            console.log("Resultado de aplicar transición:", transitionResult);
+
+            actionSuccessful = transitionResult.success;
+            operationDetails = transitionResult.details;
+
+            // Detalles de la detección para referenciar
+            detectionInfo = {
+              detected: response.applyTransitionDetection.detected,
+              confidence: response.applyTransitionDetection.confidence,
+              reason: response.applyTransitionDetection.reason
+            };
+          } catch (error) {
+            // Capturar errores específicos de la transición
+            console.error("Error al aplicar transición:", error);
+            actionSuccessful = false;
+            operationDetails = `Error al aplicar transición: ${error.message || 'Error desconocido'}`;
+            errorDetails = {
+              message: error.message || 'Error desconocido',
+              stack: error.stack,
+              type: error.constructor?.name || 'Error'
+            };
+          }
         }
         // Verificar si debemos aplicar una captura de pantalla a la timeline
         else if (response.showScreenshotDetection &&
@@ -364,17 +399,37 @@ const SelectionModal: React.FC = () => {
           }
         }
 
-        // Establecer estado final según el resultado
+        // Actualizar estado según los resultados
         setActionSuccess(actionSuccessful);
 
-        // Componer el mensaje informativo
+        // Si hubo un error, actualizar con detalles adicionales
+        if (!actionSuccessful && errorDetails) {
+          setLastActionInfo({
+            operationDetails,
+            errorDetails,
+            confidence: detectionInfo?.confidence || 0,
+            reason: detectionInfo?.reason || 'Error en la operación',
+            screenshotToAdd
+          });
+        } else {
+          setLastActionInfo({
+            operationDetails,
+            confidence: detectionInfo?.confidence || 0,
+            reason: detectionInfo?.reason || '',
+            screenshotToAdd
+          });
+        }
+
+        setShowActionInfo(actionDetected || screenshotToAdd !== null);
+
+        // Componer el mensaje informativo si tenemos respuesta válida
         let actionMessage;
         if (actionDetected) {
           // Si se detectó una acción específica (como agregar captura o transición)
           actionMessage = actionSuccessful
             ? (screenshotToAdd
                ? `✨ ${operationDetails || 'Captura aplicada correctamente'}`
-               : `✨ ${operationDetails || 'Transición aplicada correctamente'}`)
+               : `✨ ${operationDetails || 'Fade out aplicado correctamente'}`)
             : `❌ Error: ${operationDetails || 'No se pudo completar la operación.'}`;
         } else {
           // Si no se detectó ninguna acción específica, mostrar un mensaje predeterminado
@@ -391,7 +446,7 @@ const SelectionModal: React.FC = () => {
           content: response.response + (actionDetected && actionSuccessful
             ? (screenshotToAdd
               ? `\n\n✅ **Captura de pantalla aplicada a la timeline**\n- URL: ${screenshotToAdd.url}\n- Tiempo: desde ${startTime}s hasta ${endTime}s\n- Confianza: ${Math.round(detectionInfo?.confidence * 100)}%`
-              : `\n\n✅ **Transición aplicada a la timeline**\n- Tiempo: desde ${startTime}s hasta ${endTime}s\n- Confianza: ${Math.round(detectionInfo?.confidence * 100)}%`)
+              : `\n\n✅ **Fade out aplicado a la timeline**\n- Efecto: Desvanecimiento al final del clip\n- Tiempo: cerca del final en ${endTime.toFixed(1)}s\n- Confianza: ${Math.round(detectionInfo?.confidence * 100)}%`)
             : ''),
           timestamp: new Date(),
           detectionInfo: detectionInfo
@@ -403,13 +458,15 @@ const SelectionModal: React.FC = () => {
           setShowActionInfo(false);
         }, 4000);
       } else {
-        // Mostrar mensaje de error brevemente
+        // Manejar caso de error en la respuesta
+        console.error("Error en la respuesta de la API:", response);
         setActionSuccess(false);
-        setLastActionInfo(`❌ Error: ${response.error || 'No se pudo procesar tu mensaje.'}`);
+        setLastActionInfo({
+          operationDetails: "Error al procesar la solicitud: " + (response.error || "Error desconocido"),
+          confidence: 0,
+          reason: 'Error en la API'
+        });
         setShowActionInfo(true);
-        setTimeout(() => {
-          setShowActionInfo(false);
-        }, 3000);
       }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
@@ -425,11 +482,112 @@ const SelectionModal: React.FC = () => {
     }
   };
 
+  // Función para manejar cambios en el textarea
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value);
+  };
+
   // Función para manejar el envío del mensaje con Enter
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendCommand();
+    }
+  };
+
+  const handleAddScreenshot = (url: string) => {
+    try {
+      // Verificar si se trata de un APNG
+      const isAPNG = url.toLowerCase().endsWith('.apng');
+      if (isAPNG) {
+        console.log("Advertencia: Se está intentando añadir un APNG como captura de pantalla");
+
+        // Mostrar advertencia pero continuar con el proceso
+        setLastActionInfo({
+          operationDetails: "⚠️ Advertencia: El formato APNG puede no comportarse correctamente como captura. Se intentará usar como imagen estática.",
+          confidence: 0.5,
+          reason: 'Formato potencialmente problemático',
+          screenshotToAdd: url
+        });
+        setActionSuccess(true);
+        setShowActionInfo(true);
+      }
+
+      // Continuar con la lógica normal
+      // Obtener el servicio de comandos
+      const commandExecutor = CommandExecutorService.getExecutor();
+      if (!commandExecutor) {
+        console.error("CommandExecutor no disponible");
+        setLastActionInfo({
+          operationDetails: "Error: No se pudo obtener el servicio de comandos para añadir la captura",
+          confidence: 0,
+          reason: 'Error de servicio',
+          screenshotToAdd: null
+        });
+        setActionSuccess(false);
+        setShowActionInfo(true);
+        return;
+      }
+
+      // Calcular tiempo para ubicar la imagen
+      let startTime = 0;
+
+      // Si hay elementos seleccionados, usar su tiempo
+      if (selectedItems && selectedItems.length > 0) {
+        const firstItem = selectedItems[0];
+        if (firstItem.display) {
+          startTime = (firstItem.display.from || 0) / 1000; // convertir de ms a segundos
+        }
+      }
+
+      // Añadir la imagen a la timeline
+      commandExecutor.addImage(url, {
+        startTime,
+        endTime: startTime + 5, // 5 segundos de duración por defecto
+        position: { x: 0.5, y: 0.5 }, // centrado
+        isStatic: isAPNG // Si es APNG, forzar como estático
+      });
+
+      // Actualizar la UI con el éxito
+      setLastActionInfo({
+        operationDetails: `Captura añadida a la línea de tiempo${isAPNG ? ' (como imagen estática)' : ''}`,
+        confidence: 1.0,
+        reason: 'Acción manual del usuario',
+        screenshotToAdd: null
+      });
+
+      setActionSuccess(true);
+      setShowActionInfo(true);
+
+      // Ocultar después de 3 segundos
+      setTimeout(() => {
+        setShowActionInfo(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error("Error al añadir captura:", error);
+
+      // Extraer mensaje de error
+      let errorMessage = "Error desconocido";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      // Actualizar la UI con el error
+      setLastActionInfo({
+        operationDetails: `Error al añadir captura: ${errorMessage}`,
+        confidence: 0,
+        reason: 'Error en el proceso',
+        errorDetails: {
+          message: errorMessage,
+          type: error instanceof Error ? error.constructor.name : 'Error',
+          stack: error instanceof Error ? error.stack : undefined
+        },
+        screenshotToAdd: null
+      });
+
+      setActionSuccess(false);
+      setShowActionInfo(true);
     }
   };
 
@@ -474,6 +632,57 @@ const SelectionModal: React.FC = () => {
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+
+          /* Estilos para detalles de error */
+          .error-details {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: rgba(255, 0, 0, 0.05);
+            border-radius: 4px;
+            font-size: 13px;
+          }
+
+          .error-technical-info {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+          }
+
+          .error-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+          }
+
+          .log-button {
+            background-color: rgba(156, 90, 250, 0.2);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .log-button:hover {
+            background-color: rgba(156, 90, 250, 0.4);
+          }
+
+          details summary {
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+          }
+
+          details summary:hover {
+            color: rgba(255, 255, 255, 0.9);
           }
         `}
       </style>
@@ -580,14 +789,115 @@ const SelectionModal: React.FC = () => {
                   : actionSuccess === true
                     ? '✨'
                     : 'ℹ️'}
+              </div>
+              <div>{lastActionInfo.operationDetails}</div>
+            </div>
+
+            {/* Mostrar detalles de error para depuración */}
+            {!actionSuccess && lastActionInfo.errorDetails && (
+              <div className="error-details">
+                <details>
+                  <summary>Ver detalles técnicos del error</summary>
+                  <div className="error-technical-info">
+                    <p><strong>Tipo de error:</strong> {lastActionInfo.errorDetails.type}</p>
+                    <p><strong>Mensaje:</strong> {lastActionInfo.errorDetails.message}</p>
+                    <p><strong>Recomendación:</strong> Verifique los logs en la consola del navegador para más información o intente usar un formato diferente para la transición (GIF/MP4).</p>
                   </div>
-              <div>{lastActionInfo}</div>
-                      </div>
+                </details>
+
+                <div className="error-actions">
+                                  <button
+                    className="log-button"
+                    onClick={() => {
+                      console.log("Consulte la consola para más información de depuración");
+                      alert("Los logs de depuración están disponibles en la consola del navegador (F12 > Console)");
+                    }}
+                  >
+                    Ver logs
+                                  </button>
+                              </div>
                     </div>
                   )}
 
+            {/* Si había captura de pantalla */}
+            {lastActionInfo.screenshotToAdd && (
                   <div style={{
-          display: 'flex',
+                marginTop: '16px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                paddingTop: '16px',
+              }}>
+                <img
+                  src={lastActionInfo.screenshotToAdd}
+                  alt="Captura de pantalla"
+                  style={{
+                    width: '100%',
+                    borderRadius: '4px',
+                    marginBottom: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                />
+                    <div style={{
+                  display: 'flex',
+                  gap: '8px'
+                }}>
+                  <button
+                    onClick={() => handleAddScreenshot(lastActionInfo.screenshotToAdd)}
+                    style={{
+                      flex: '1',
+                      background: 'linear-gradient(135deg, rgba(70, 200, 120, 0.7) 0%, rgba(50, 180, 100, 0.8) 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(50, 180, 100, 0.3)',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 14px rgba(50, 180, 100, 0.4)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(50, 180, 100, 0.3)';
+                    }}
+                  >
+                    Añadir a Timeline
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowActionInfo(false);
+                      setLastActionInfo(null);
+                    }}
+                        style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '6px',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      cursor: 'pointer',
+                      padding: '8px 16px',
+                      fontSize: '13px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+        )}
+
+      <div style={{
+        display: 'flex',
           flexDirection: 'column',
           gap: '12px',
           borderTop: '1px solid rgba(156, 90, 250, 0.2)',
@@ -597,33 +907,32 @@ const SelectionModal: React.FC = () => {
           <textarea
             ref={textareaRef}
             value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={handleKeyPress}
+            onChange={handleTextareaChange}
+            placeholder="Ejemplo: 'aplica captura a la timeline' o 'añade transición'"
             disabled={isSending}
-            placeholder="Escribe un comando... (ej: 'aplica captura a la timeline' o 'añade transición')"
-                        style={{
-                          width: '100%',
-              height: '80px',
-              background: 'rgba(30, 15, 50, 0.5)',
+            style={{
+              background: 'rgba(20, 10, 35, 0.5)',
               border: '1px solid rgba(156, 90, 250, 0.4)',
               borderRadius: '8px',
-              padding: '12px 14px',
               color: 'white',
               fontSize: '14px',
+              padding: '12px',
+              resize: 'vertical',
+              minHeight: '80px',
+              width: '100%',
+              boxSizing: 'border-box',
+              transition: 'all 0.2s ease',
               outline: 'none',
-              resize: 'none',
-              transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2) inset',
+              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.3)',
               fontFamily: 'Inter, system-ui, sans-serif',
-              lineHeight: '1.5'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = 'rgba(156, 90, 250, 0.8)';
-              e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2) inset, 0 0 0 2px rgba(156, 90, 250, 0.1)';
+              e.target.style.borderColor = 'rgba(156, 90, 250, 0.7)';
+              e.target.style.boxShadow = 'inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(156, 90, 250, 0.2)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'rgba(156, 90, 250, 0.4)';
-              e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2) inset';
+              e.target.style.boxShadow = 'inset 0 2px 4px rgba(0, 0, 0, 0.3)';
             }}
           />
         <button

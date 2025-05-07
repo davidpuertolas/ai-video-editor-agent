@@ -355,7 +355,7 @@ async function handleTimelineChat(
         detected: applyTransitionDetection.detected && applyTransitionDetection.confidence > 0.2,
         confidence: applyTransitionDetection.confidence,
         reason: applyTransitionDetection.reason,
-        transitionPath: applyTransitionDetection.transitionPath || '/transitions/transition1.apng'
+        transitionPath: applyTransitionDetection.transitionPath || '/transitions/fade-out.apng'
       };
     }
 
@@ -615,12 +615,12 @@ Responde de manera breve y concisa. Si detectas una solicitud para agregar eleme
           (/agregar|añadir|colocar|poner|usar|insertar/i.test(lastUserMessage.content) &&
            /imagen/i.test(lastUserMessage.content))) {
 
-        elementData = {
-          detected: true,
-          confidence: 0.9,
-          element: {
-            type: "image",
-            url: imageUrl,
+          elementData = {
+            detected: true,
+            confidence: 0.9,
+            element: {
+              type: "image",
+              url: imageUrl,
             startTime: 0,
             endTime: 5
           }
