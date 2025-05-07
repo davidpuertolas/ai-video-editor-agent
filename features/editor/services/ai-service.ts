@@ -619,13 +619,12 @@ export class AIService {
       }
 
       // Enviar todo a la API junto con el mensaje del usuario
-      const response = await fetch('/api/ai', {
+      const response = await fetch('/api/ai-timeline', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type: 'timeline_chat',
           message: request.message,
           selectedItems: request.selectedItems,
           selectedText: selectedText,

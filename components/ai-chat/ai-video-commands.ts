@@ -1,6 +1,6 @@
 import StateManager from "@designcombo/state";
 import { dispatch } from "@designcombo/events";
-import { DESIGN_ADD_TEXT, DESIGN_ADD_AUDIO, DESIGN_ADD_IMAGE, ADD_TEXT, ADD_VIDEO, ADD_IMAGE, ACTIVE_SPLIT, LAYER_SELECT, LAYER_DELETE, TIMELINE_SCALE_CHANGED, EDIT_OBJECT } from "@designcombo/state";
+import { DESIGN_ADD_TEXT, DESIGN_ADD_AUDIO, DESIGN_ADD_IMAGE, ADD_TEXT, ADD_VIDEO, ADD_IMAGE, ADD_AUDIO, ACTIVE_SPLIT, LAYER_SELECT, LAYER_DELETE, TIMELINE_SCALE_CHANGED, EDIT_OBJECT } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 
 
@@ -17,6 +17,7 @@ export interface VideoCommandExecutor {
   getAllTimelineElements: () => Promise<any[]>;
   compactTimeline: () => Promise<boolean>;
   smartTrim: () => Promise<boolean>;
+  addMusic: (musicPath: string, options?: MusicOptions) => void;
 }
 
 interface TextOptions {
@@ -55,6 +56,15 @@ interface SubtitleOptions {
   groupWords?: boolean; // Si se deben agrupar palabras (true) o usar subtítulos completos (false)
   startTime?: number;   // Tiempo de inicio para filtrar subtítulos (opcional)
   endTime?: number;     // Tiempo de fin para filtrar subtítulos (opcional)
+}
+
+interface MusicOptions {
+  startTime?: number; // en segundos
+  endTime?: number; // en segundos
+  volume?: number; // 0-100
+  fadeIn?: boolean;
+  fadeOut?: boolean;
+  respectNativeDuration?: boolean; // Respetar la duración nativa del archivo de audio
 }
 
 // Tipo para representar un segmento de subtítulo
@@ -1346,6 +1356,49 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
       } catch (error) {
         console.error("Error al realizar el recorte inteligente:", error);
         return false;
+      }
+    },
+
+    addMusic: (musicPath: string, options?: MusicOptions) => {
+      try {
+        // Valores predeterminados
+        const startTime = options?.startTime !== undefined ? options.startTime : 0;
+        const endTime = options?.endTime !== undefined ? options.endTime : (startTime + 30); // Duración predeterminada más larga para música
+        const volume = options?.volume !== undefined ? options.volume : 80; // Volumen predeterminado al 80%
+        const respectNativeDuration = options?.respectNativeDuration !== undefined ? options.respectNativeDuration : true; // Por defecto, respetar duración nativa
+
+        console.log(`Añadiendo música desde ${musicPath}`);
+        console.log(`Tiempos: ${startTime}s a ${endTime}s, volumen: ${volume}, respectNativeDuration: ${respectNativeDuration}`);
+
+        // Crear payload para la música
+        const audioPayload = {
+          id: generateId(),
+          display: {
+            from: startTime * 1000, // Convertir a milisegundos
+            to: endTime * 1000     // Convertir a milisegundos
+          },
+          type: 'audio',
+          details: {
+            src: musicPath,
+            volume: volume,
+            fadeIn: options?.fadeIn === true,
+            fadeOut: options?.fadeOut === true
+          },
+        };
+
+        // Agregar audio al timeline usando ADD_AUDIO
+        dispatch(ADD_AUDIO, {
+          payload: audioPayload,
+          options: {
+            respectNativeDuration: respectNativeDuration
+          },
+        });
+
+        console.log(`Música agregada exitosamente con ID: ${audioPayload.id}`);
+        return audioPayload.id;
+      } catch (error) {
+        console.error("Error al agregar música:", error);
+        throw error;
       }
     }
   };

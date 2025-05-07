@@ -10,6 +10,7 @@ import { useStateManager } from "@/features/editor/hooks/state-manager";
 import { createVideoCommandExecutor, VideoCommandExecutor } from "./ai-video-commands";
 import { createUploadsDetails } from "@/utils/upload";
 import CommandExecutorService from "@/features/editor/services/command-executor-service";
+import useStore from "@/features/editor/store/use-store";
 
 // Función para extraer tiempos de inicio y fin de una imagen a partir del mensaje
 function extractImageTimesFromMessage(messageContent: string): { startTime: number, endTime: number } {
@@ -106,7 +107,50 @@ type Message = {
   content: string;
   role: "assistant" | "user";
   timestamp: Date;
-  imageUrl?: string; // Nueva propiedad para URLs de imagen
+  imageUrl?: string; // Propiedad para URLs de imagen
+  musicOptions?: string[]; // Propiedad para opciones de música
+  isInitial?: boolean; // Propiedad para marcar mensajes iniciales
+};
+
+// Componente para renderizar opciones de música como botones clickables
+const MusicOptions = ({ options, onSelectMusic }) => {
+  if (!Array.isArray(options) || options.length === 0) {
+    return null;
+  }
+
+  // Función para convertir el nombre del archivo a un nombre amigable
+  const getFriendlyName = (musicPath) => {
+    const filename = musicPath.split('/').pop() || musicPath;
+
+    // Mapear nombres de archivos a nombres amigables
+    if (filename === "song1.mp3") return "Música Energética";
+    if (filename === "song2.mp3") return "Melodía Relajante";
+
+    // Si no hay mapeo específico, devolver el nombre del archivo
+    return filename;
+  };
+
+  return (
+    <div className="flex flex-col gap-3 mt-3">
+      <div className="flex flex-wrap gap-2">
+        {options.map((musicPath, index) => {
+          const musicName = getFriendlyName(musicPath);
+          return (
+            <button
+              key={index}
+              onClick={() => onSelectMusic(musicPath)}
+              className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 9l12-3" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {musicName}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 // Función para procesar elementos detectados por la IA
@@ -326,6 +370,11 @@ const processDetectedElement = async (elementData, commandExecutor, finalRespons
           finalResponse += `\n\n[Error al intentar realizar el recorte inteligente: ${error.message || "Error desconocido"}]`;
         }
       }
+      else if (element.type === "music" && Array.isArray(element.options) && element.options.length > 0) {
+        // Respuesta más corta para música
+        finalResponse = "¿Cuál de estas opciones te gustaría añadir?";
+        elementAdded = true;
+      }
     }
   } catch (error) {
     console.error("Error al procesar elemento detectado:", error);
@@ -333,6 +382,58 @@ const processDetectedElement = async (elementData, commandExecutor, finalRespons
   }
 
   return { finalResponse, elementAdded };
+};
+
+// Componente para mostrar la animación de "pensando"
+const ThinkingAnimation = () => (
+  <div className="flex flex-col items-start animate-fadeIn">
+    <div className="max-w-[85%] rounded-md px-4 py-2 bg-[rgb(40,20,60)] text-zinc-200">
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1">
+          <span className="h-2 w-2 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: "0ms" }}></span>
+          <span className="h-2 w-2 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: "300ms" }}></span>
+          <span className="h-2 w-2 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: "600ms" }}></span>
+        </div>
+        <span className="text-xs text-zinc-400">Pensando...</span>
+      </div>
+    </div>
+  </div>
+);
+
+// Componente para mostrar el razonamiento desplegable
+const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mt-2 text-xs border-t border-purple-800/30 pt-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+        <span>Ver razonamiento</span>
+      </button>
+
+      {isOpen && (
+        <div className="mt-2 p-2 bg-[rgb(30,15,45)] rounded text-zinc-400 whitespace-pre-wrap">
+          {reasoning}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function AIChat() {
@@ -355,7 +456,11 @@ export default function AIChat() {
 
   const stateManager = useStateManager();
   const { timeline, scenes, playerRef } = useDataState();
+  const { duration } = useStore(); // Obtener la duración del store
   const commandExecutor = useRef<VideoCommandExecutor>(createVideoCommandExecutor(stateManager));
+
+  // Añadir estado para el modo (chat o agente)
+  const [mode, setMode] = useState<"chat" | "agent">("chat");
 
   // Inicializar el CommandExecutorService con el executor actual
   useEffect(() => {
@@ -384,7 +489,7 @@ export default function AIChat() {
   // Scroll al último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   // Actualizar el ejecutor de comandos cuando cambie el stateManager
   useEffect(() => {
@@ -545,7 +650,7 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
       };
 
       try {
-        const response = await fetch('/api/ai', {
+        const response = await fetch('/api/ai-chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -591,14 +696,25 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
         finalResponse = processResult.finalResponse;
         elementAdded = processResult.elementAdded;
 
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: finalResponse,
+        // Crear mensaje con los detalles completos
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          content: finalResponse || data.message.content,
           role: "assistant",
           timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, assistantMessage]);
+        // Si se detectó un elemento de música, agregar las opciones al mensaje
+        if (elementData?.detected &&
+            elementData.element?.type === "music" &&
+            Array.isArray(elementData.element.options)) {
+
+          newMessage.musicOptions = elementData.element.options;
+          console.log("Opciones de música agregadas al mensaje:", newMessage.musicOptions);
+        }
+
+        // Actualizar mensajes
+        setMessages(prev => [...prev, newMessage]);
       } catch (apiError) {
         console.error("Error en la comunicación con la API:", apiError);
 
@@ -642,9 +758,96 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
     }
   };
 
+  // Función para manejar la selección de música
+  const handleMusicSelect = async (musicPath: string) => {
+    try {
+      console.log(`Usuario seleccionó música: ${musicPath}`);
+
+      // Calcular la duración del video en segundos usando el duration del store
+      const videoDuration = duration ? Math.floor(duration / 1000) : 300; // 5 minutos por defecto
+      console.log(`Duración del video (desde useStore): ${videoDuration} segundos`);
+
+      // Configuración de opciones para la música
+      const musicOptions = {
+        startTime: 0,
+        endTime: videoDuration, // Usar toda la duración del video
+        volume: 80,
+        fadeIn: true,
+        fadeOut: true,
+        respectNativeDuration: true // Respetar la duración natural de la música
+      };
+
+      // Añadir la música al timeline (respetará la duración natural si es más corta que el video)
+      commandExecutor.current.addMusic(musicPath, musicOptions);
+
+      // Obtener un nombre amigable para la música
+      const getMusicFriendlyName = (path) => {
+        const filename = path.split('/').pop() || path;
+        if (filename === "song1.mp3") return "Música Energética";
+        if (filename === "song2.mp3") return "Melodía Relajante";
+        return filename;
+      };
+
+      // Añadir un mensaje de confirmación
+      const musicName = getMusicFriendlyName(musicPath);
+      const confirmationMsg: Message = {
+        id: Date.now().toString(),
+        content: `He añadido "${musicName}" a tu video. La música se adaptará automáticamente: si es más corta que el video, mantendrá su duración natural; si es más larga, se ajustará a la duración del video (${videoDuration} segundos).`,
+        role: "assistant",
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, confirmationMsg]);
+
+    } catch (error) {
+      console.error("Error al añadir música:", error);
+
+      // Mensaje de error
+      const errorMsg: Message = {
+        id: Date.now().toString(),
+        content: `No se pudo añadir la música. Error: ${error.message || "Error desconocido"}`,
+        role: "assistant",
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, errorMsg]);
+    }
+  };
+
+  // Manejar cambio de modo
+  const handleModeChange = (newMode: "chat" | "agent") => {
+    // Si el modo es diferente, cambiar y reiniciar la conversación
+    if (newMode !== mode) {
+      setMode(newMode);
+
+      // Mensaje inicial específico según el modo
+      const initialMessage = newMode === "chat"
+        ? "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?"
+        : "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?";
+
+      // Reiniciar la conversación con el mensaje apropiado
+      setMessages([
+        {
+          id: Date.now().toString(),
+          content: initialMessage,
+          role: "assistant",
+          timestamp: new Date(),
+          // Marcar el mensaje como inicial para evitar mostrar razonamiento
+          isInitial: true
+        },
+      ]);
+
+      // Limpiar otros estados
+      setInput("");
+      setImageFile(null);
+      setImagePreview(null);
+      setLastUploadedImageUrl("");
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-[rgb(20,10,30)] border-l border-purple-800/30">
-      {/* Header simplificado */}
+      {/* Header con toggle */}
       <div className="bg-[rgb(30,15,45)] p-3 flex justify-between items-center border-b border-purple-800/30">
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded flex items-center justify-center bg-purple-700">
@@ -652,6 +855,31 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
           </div>
           <h3 className="font-medium text-white text-sm">Asistente IA</h3>
         </div>
+
+        {/* Toggle entre Chat y Agente */}
+        <div className="flex items-center bg-[rgb(40,20,60)] rounded-full p-0.5 mx-auto">
+          <button
+            onClick={() => handleModeChange("chat")}
+            className={`px-3 py-1 text-xs rounded-full transition-all ${
+              mode === "chat"
+                ? "bg-purple-700 text-white font-medium"
+                : "text-purple-300 hover:text-white"
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => handleModeChange("agent")}
+            className={`px-3 py-1 text-xs rounded-full transition-all ${
+              mode === "agent"
+                ? "bg-purple-700 text-white font-medium"
+                : "text-purple-300 hover:text-white"
+            }`}
+          >
+            Agente
+          </button>
+        </div>
+
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -665,42 +893,56 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
         </div>
       </div>
 
-      {/* Área de mensajes simplificada */}
-      <ScrollArea className="flex-1 pr-2 chat-scrollbar">
-        <div className="p-3 space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex flex-col animate-fadeIn ${
-                message.role === "assistant" ? "items-start" : "items-end"
-              }`}
-            >
+      {/* Área de mensajes con altura fija y máxima */}
+      <div className="flex-1 overflow-hidden relative max-h-[calc(100%-120px)]">
+        <ScrollArea className="h-full pr-2 chat-scrollbar absolute inset-0">
+          <div className="p-3 space-y-3">
+            {messages.map((message) => (
               <div
-                className={`max-w-[85%] rounded-md px-4 py-2 ${
-                  message.role === "assistant"
-                    ? "bg-[rgb(40,20,60)] text-zinc-200"
-                    : "bg-purple-700 text-white"
+                key={message.id}
+                className={`flex flex-col animate-fadeIn ${
+                  message.role === "assistant" ? "items-start" : "items-end"
                 }`}
               >
-                <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                {message.imageUrl && (
-                  <div className="mt-2 rounded overflow-hidden">
-                    <img
-                      src={message.imageUrl}
-                      alt="Imagen adjunta"
-                      className="max-h-48 max-w-full object-contain"
+                <div
+                  className={`max-w-[85%] rounded-md px-4 py-2 ${
+                    message.role === "assistant"
+                      ? "bg-[rgb(40,20,60)] text-zinc-200"
+                      : "bg-purple-700 text-white"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                  {message.imageUrl && (
+                    <div className="mt-2 rounded overflow-hidden">
+                      <img
+                        src={message.imageUrl}
+                        alt="Imagen adjunta"
+                        className="max-h-48 max-w-full object-contain"
+                      />
+                    </div>
+                  )}
+                  {message.musicOptions && message.musicOptions.length > 0 && (
+                    <MusicOptions
+                      options={message.musicOptions}
+                      onSelectMusic={handleMusicSelect}
                     />
-                  </div>
-                )}
+                  )}
+
+                  {/* Sección de razonamiento (solo en modo agente, para mensajes del asistente, y no para el mensaje inicial) */}
+                  {mode === "agent" && message.role === "assistant" && !message.isInitial && (
+                    <ReasoningSection reasoning={generateReasoning(message.content)} />
+                  )}
+                </div>
+                <div className={`text-[10px] mt-0.5 px-1 ${message.role === "assistant" ? "text-zinc-500" : "text-purple-300"}`}>
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div className={`text-[10px] mt-0.5 px-1 ${message.role === "assistant" ? "text-zinc-500" : "text-purple-300"}`}>
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} className="h-2" />
-        </div>
-      </ScrollArea>
+            ))}
+            {isLoading && <ThinkingAnimation />}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Área de vista previa de imagen */}
       {imagePreview && (
@@ -778,4 +1020,22 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
       />
     </div>
   );
+}
+
+// Función para generar razonamiento ficticio basado en el contenido del mensaje
+function generateReasoning(content: string): string {
+  // Por ahora, siempre devolver el mismo razonamiento esquemático
+  return `ANÁLISIS:
+• Tipo: Saludo simple
+• Idioma: Inglés
+• Contexto: Inicio de conversación
+
+PROCESO:
+1. Identificar intención → Saludo inicial
+2. Seleccionar respuesta → Protocolo estándar de bienvenida
+3. Adaptar al contexto → Edición de video
+
+SALIDA:
+→ Responder con saludo amigable
+→ Ofrecer asistencia específica para edición`;
 }
