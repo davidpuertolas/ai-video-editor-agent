@@ -35,14 +35,14 @@ const FadeEffect = ({
     setLocalFadeOutDuration(fadeOutDuration);
     setFadeInEnabled(enabled.fadeIn);
     setFadeOutEnabled(enabled.fadeOut);
-  }, [fadeInDuration, fadeOutDuration, enabled]);
+  }, [fadeInDuration, fadeOutDuration, enabled.fadeIn, enabled.fadeOut]);
 
-  const applyFadeInAnimation = () => {
+  const applyFadeInAnimation = (duration = localFadeInDuration) => {
     const animation: Animation = {
       property: "opacity",
       from: 0,
       to: 1,
-      durationInFrames: localFadeInDuration,
+      durationInFrames: duration,
       ease: Easing.easeInOut,
       name: "Fade In",
       previewUrl: "https://cdn.designcombo.dev/animations/FadeIn.webp",
@@ -62,12 +62,12 @@ const FadeEffect = ({
     setFadeInEnabled(true);
   };
 
-  const applyFadeOutAnimation = () => {
+  const applyFadeOutAnimation = (duration = localFadeOutDuration) => {
     const animation: Animation = {
       property: "opacity",
       from: 1,
       to: 0,
-      durationInFrames: localFadeOutDuration,
+      durationInFrames: duration,
       ease: Easing.easeInOut,
       name: "Fade Out",
       previewUrl: "https://cdn.designcombo.dev/animations/FadeOut.webp",
@@ -111,35 +111,37 @@ const FadeEffect = ({
     setFadeOutEnabled(false);
   };
 
-  const toggleFadeIn = () => {
-    if (fadeInEnabled) {
-      removeFadeInAnimation();
-    } else {
+  const handleToggleFadeIn = (checked: boolean) => {
+    if (checked) {
       applyFadeInAnimation();
-    }
-  };
-
-  const toggleFadeOut = () => {
-    if (fadeOutEnabled) {
-      removeFadeOutAnimation();
     } else {
-      applyFadeOutAnimation();
+      removeFadeInAnimation();
     }
   };
 
-  const updateFadeInDuration = (value: number) => {
+  const handleToggleFadeOut = (checked: boolean) => {
+    if (checked) {
+      applyFadeOutAnimation();
+    } else {
+      removeFadeOutAnimation();
+    }
+  };
+
+  const handleFadeInDurationChange = (value: number) => {
     setLocalFadeInDuration(value);
     if (fadeInEnabled) {
-      applyFadeInAnimation();
+      applyFadeInAnimation(value);
     }
   };
 
-  const updateFadeOutDuration = (value: number) => {
+  const handleFadeOutDurationChange = (value: number) => {
     setLocalFadeOutDuration(value);
     if (fadeOutEnabled) {
-      applyFadeOutAnimation();
+      applyFadeOutAnimation(value);
     }
   };
+
+  console.log("FadeEffect render - fadeInEnabled:", fadeInEnabled, "fadeOutEnabled:", fadeOutEnabled);
 
   return (
     <div className="space-y-4 mt-2">
@@ -151,7 +153,11 @@ const FadeEffect = ({
             <ArrowUpFromLine size={16} />
             <span className="text-sm">Fade In</span>
           </div>
-          <Switch checked={fadeInEnabled} onCheckedChange={toggleFadeIn} />
+          <Switch
+            checked={fadeInEnabled}
+            onCheckedChange={handleToggleFadeIn}
+            className={fadeInEnabled ? "data-[state=checked]:bg-primary" : ""}
+          />
         </div>
 
         {fadeInEnabled && (
@@ -162,24 +168,13 @@ const FadeEffect = ({
                 <span className="text-xs">{(localFadeInDuration / 30).toFixed(1)}s</span>
                 <Slider
                   value={[localFadeInDuration]}
-                  onValueChange={(value) => setLocalFadeInDuration(value[0])}
-                  onValueCommit={() => updateFadeInDuration(localFadeInDuration)}
+                  onValueChange={(values) => handleFadeInDurationChange(values[0])}
                   min={10}
                   max={120}
                   step={5}
                   className="w-28"
                 />
               </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-7"
-                onClick={() => applyFadeInAnimation()}
-              >
-                Aplicar
-              </Button>
             </div>
           </div>
         )}
@@ -189,7 +184,11 @@ const FadeEffect = ({
             <ArrowDownToLine size={16} />
             <span className="text-sm">Fade Out</span>
           </div>
-          <Switch checked={fadeOutEnabled} onCheckedChange={toggleFadeOut} />
+          <Switch
+            checked={fadeOutEnabled}
+            onCheckedChange={handleToggleFadeOut}
+            className={fadeOutEnabled ? "data-[state=checked]:bg-primary" : ""}
+          />
         </div>
 
         {fadeOutEnabled && (
@@ -200,24 +199,13 @@ const FadeEffect = ({
                 <span className="text-xs">{(localFadeOutDuration / 30).toFixed(1)}s</span>
                 <Slider
                   value={[localFadeOutDuration]}
-                  onValueChange={(value) => setLocalFadeOutDuration(value[0])}
-                  onValueCommit={() => updateFadeOutDuration(localFadeOutDuration)}
+                  onValueChange={(values) => handleFadeOutDurationChange(values[0])}
                   min={10}
                   max={120}
                   step={5}
                   className="w-28"
                 />
               </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-7"
-                onClick={() => applyFadeOutAnimation()}
-              >
-                Aplicar
-              </Button>
             </div>
           </div>
         )}
