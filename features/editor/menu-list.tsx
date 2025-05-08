@@ -2,7 +2,7 @@ import useLayoutStore from "./store/use-layout-store";
 import { Icons } from "@/components/shared/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Scissors, Sparkles, WandSparkles, Sliders, Paintbrush, Settings } from "lucide-react";
+import { Scissors, Sparkles, WandSparkles, Sliders, Paintbrush, Settings, Workflow } from "lucide-react";
 import useStore from "./store/use-store";
 import { useEffect } from "react";
 
@@ -175,6 +175,24 @@ export default function MenuList() {
         title="Recorte Inteligente"
       >
         <WandSparkles width={16} />
+      </Button>
+
+      {/* Nuevo botón para Workflows de Edición */}
+      <Button
+        onClick={() => {
+          setActiveMenuItem("workflows");
+          setShowMenuItem(true);
+        }}
+        className={cn(
+          showMenuItem && activeMenuItem === "workflows"
+            ? "bg-purple-900/80 text-purple-100"
+            : "text-muted-foreground hover:text-purple-300/70 hover:bg-purple-950/50",
+        )}
+        variant={"ghost"}
+        size={"icon"}
+        title="Workflows de Edición"
+      >
+        <Workflow width={16} />
       </Button>
     </div>
   );

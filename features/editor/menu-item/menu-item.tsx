@@ -8,6 +8,7 @@ import { Subtitles } from "./subtitles";
 import { AdvancedEdit } from "./advanced-edit";
 import SmartTrim from "@/components/smart-trim";
 import { AttributeEditor } from "./attribute-editor";
+import { Workflows } from "./workflows";
 import useStore from "../store/use-store";
 import { useEffect } from "react";
 
@@ -38,6 +39,8 @@ const ActiveMenuItem = () => {
     return <AdvancedEdit />;
   } else if (activeMenuItem === "smarttrim") {
     return <SmartTrim />;
+  } else if (activeMenuItem === "workflows") {
+    return <Workflows />;
   } else {
     // Si no hay un panel seleccionado, no mostrar nada
     return null;
