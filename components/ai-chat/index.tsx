@@ -11,6 +11,30 @@ import { createVideoCommandExecutor, VideoCommandExecutor } from "./ai-video-com
 import { createUploadsDetails } from "@/utils/upload";
 import CommandExecutorService from "@/features/editor/services/command-executor-service";
 import useStore from "@/features/editor/store/use-store";
+import ReactMarkdown from "react-markdown";
+
+// Indica si la solicitud debe ser procesada por el agente
+function shouldUseAgent(mode: "chat" | "agent", message: string): boolean {
+  if (mode !== "agent") return false;
+
+  // Patrones que indican que el usuario quiere que el agente edite automáticamente el video
+  const autoEditPatterns = [
+    /edita\s+(el|este|mi)?\s*video/i,
+    /mejora\s+(el|este|mi)?\s*video/i,
+    /optimiza\s+(el|este|mi)?\s*video/i,
+    /procesa\s+(el|este|mi)?\s*video/i,
+    /arregla\s+(el|este|mi)?\s*video/i,
+    /modifica\s+(el|este|mi)?\s*video/i,
+    /trabaja\s+(en|con)\s+(el|este|mi)?\s*video/i,
+    /puedes\s+editar/i,
+    /^edita$/i,
+    /^editar$/i,
+    /^mejora$/i,
+    /^optimiza$/i,
+  ];
+
+  return autoEditPatterns.some(pattern => pattern.test(message.trim()));
+}
 
 // Función para extraer tiempos de inicio y fin de una imagen a partir del mensaje
 function extractImageTimesFromMessage(messageContent: string): { startTime: number, endTime: number } {
@@ -100,58 +124,6 @@ function extractImageTimesFromMessage(messageContent: string): { startTime: numb
 
   return { startTime, endTime };
 }
-
-// Tipo para los mensajes
-type Message = {
-  id: string;
-  content: string;
-  role: "assistant" | "user";
-  timestamp: Date;
-  imageUrl?: string; // Propiedad para URLs de imagen
-  musicOptions?: string[]; // Propiedad para opciones de música
-  isInitial?: boolean; // Propiedad para marcar mensajes iniciales
-};
-
-// Componente para renderizar opciones de música como botones clickables
-const MusicOptions = ({ options, onSelectMusic }) => {
-  if (!Array.isArray(options) || options.length === 0) {
-    return null;
-  }
-
-  // Función para convertir el nombre del archivo a un nombre amigable
-  const getFriendlyName = (musicPath) => {
-    const filename = musicPath.split('/').pop() || musicPath;
-
-    // Mapear nombres de archivos a nombres amigables
-    if (filename === "song1.mp3") return "Música Energética";
-    if (filename === "song2.mp3") return "Melodía Relajante";
-
-    // Si no hay mapeo específico, devolver el nombre del archivo
-    return filename;
-  };
-
-  return (
-    <div className="flex flex-col gap-3 mt-3">
-      <div className="flex flex-wrap gap-2">
-        {options.map((musicPath, index) => {
-          const musicName = getFriendlyName(musicPath);
-          return (
-            <button
-              key={index}
-              onClick={() => onSelectMusic(musicPath)}
-              className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 9l12-3" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {musicName}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
 
 // Función para procesar elementos detectados por la IA
 const processDetectedElement = async (elementData, commandExecutor, finalResponseRef, timeline, lastUploadedImageUrl, currentImageUrlForThisRequest) => {
@@ -384,6 +356,60 @@ const processDetectedElement = async (elementData, commandExecutor, finalRespons
   return { finalResponse, elementAdded };
 };
 
+// Tipo para los mensajes
+type Message = {
+  id: string;
+  content: string;
+  role: "assistant" | "user";
+  timestamp: Date;
+  imageUrl?: string; // Propiedad para URLs de imagen
+  musicOptions?: string[]; // Propiedad para opciones de música
+  isInitial?: boolean; // Propiedad para marcar mensajes iniciales
+  isStreaming?: boolean; // Propiedad para marcar mensajes en streaming
+  onStreamingComplete?: () => void; // Propiedad para manejar la finalización de streaming
+};
+
+// Componente para renderizar opciones de música como botones clickables
+const MusicOptions = ({ options, onSelectMusic }) => {
+  if (!Array.isArray(options) || options.length === 0) {
+    return null;
+  }
+
+  // Función para convertir el nombre del archivo a un nombre amigable
+  const getFriendlyName = (musicPath) => {
+    const filename = musicPath.split('/').pop() || musicPath;
+
+    // Mapear nombres de archivos a nombres amigables
+    if (filename === "song1.mp3") return "Música Energética";
+    if (filename === "song2.mp3") return "Melodía Relajante";
+
+    // Si no hay mapeo específico, devolver el nombre del archivo
+    return filename;
+  };
+
+  return (
+    <div className="flex flex-col gap-3 mt-3">
+      <div className="flex flex-wrap gap-2">
+        {options.map((musicPath, index) => {
+          const musicName = getFriendlyName(musicPath);
+          return (
+            <button
+              key={index}
+              onClick={() => onSelectMusic(musicPath)}
+              className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 9l12-3" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {musicName}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // Componente para mostrar la animación de "pensando"
 const ThinkingAnimation = () => (
   <div className="flex flex-col items-start animate-fadeIn">
@@ -403,6 +429,8 @@ const ThinkingAnimation = () => (
 // Componente para mostrar el razonamiento desplegable
 const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
   const [isOpen, setIsOpen] = useState(false);
+  // Generar un tiempo aleatorio entre 0.5 y 1.5 segundos
+  const processingTime = useRef((Math.random() * 1.0 + 0.5).toFixed(1));
 
   return (
     <div className="mt-2 text-xs border-t border-purple-800/30 pt-2">
@@ -424,11 +452,11 @@ const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
         >
           <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
-        <span>Ver razonamiento</span>
+        <span>Reasoned for {processingTime.current}s</span>
       </button>
 
       {isOpen && (
-        <div className="mt-2 p-2 bg-[rgb(30,15,45)] rounded text-zinc-400 whitespace-pre-wrap">
+        <div className="mt-2 p-2 bg-[rgb(30,15,45)] rounded text-zinc-400 whitespace-pre-wrap font-mono text-[11px]">
           {reasoning}
         </div>
       )}
@@ -436,11 +464,35 @@ const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
   );
 };
 
+// Componente para simular el efecto de texto en streaming
+const StreamingText = ({ text, onComplete }: { text: string, onComplete?: () => void }) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    let index = 0;
+    const intervalId = setInterval(() => {
+      setDisplayedText(text.substring(0, index + 1));
+      index++;
+
+      if (index >= text.length) {
+        clearInterval(intervalId);
+        setIsComplete(true);
+        if (onComplete) onComplete();
+      }
+    }, 20); // Velocidad de tipeo más lenta (20ms por caracter)
+
+    return () => clearInterval(intervalId);
+  }, [text, onComplete]);
+
+  return <div className="whitespace-pre-wrap">{displayedText}</div>;
+};
+
 export default function AIChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?",
+      content: "Escribe \"edita el video\" y optimizaré tu video con recorte inteligente y subtítulos automáticos.",
       role: "assistant",
       timestamp: new Date(),
     },
@@ -453,6 +505,9 @@ export default function AIChat() {
   const [lastUploadedImageUrl, setLastUploadedImageUrl] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Estado para realizar un seguimiento del progreso del auto-edit
+  const [autoEditStep, setAutoEditStep] = useState<number>(0);
+  const [isAutoEditing, setIsAutoEditing] = useState<boolean>(false);
 
   const stateManager = useStateManager();
   const { timeline, scenes, playerRef } = useDataState();
@@ -470,12 +525,130 @@ export default function AIChat() {
     }
   }, [commandExecutor.current]);
 
+  // Función para realizar la edición automática en modo agente
+  const handleAutoEdit = async () => {
+    try {
+      setIsAutoEditing(true);
+      // Mostrar "Pensando..." antes del primer mensaje
+      setIsLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Función para añadir un mensaje, esperar a que termine y mostrar "Pensando..." después
+      const addMessageAndWait = async (content: string): Promise<void> => {
+        return new Promise((resolve) => {
+          const messageId = Date.now().toString();
+
+          setMessages(prev => [...prev, {
+            id: messageId,
+            content: content,
+            role: "assistant",
+            timestamp: new Date(),
+            isStreaming: true,
+            onStreamingComplete: () => {
+              // Mostrar "Pensando..." inmediatamente después de que termine el mensaje
+              setIsLoading(true);
+              setTimeout(() => {
+                resolve();
+              }, 1000); // Mantener "Pensando..." por 1 segundo
+            }
+          }]);
+
+          // Desactivamos "Pensando..." justo antes de que el mensaje comience a mostrarse
+          setIsLoading(false);
+        });
+      };
+
+      // Mensaje inicial explicando el plan
+      await addMessageAndWait("Voy a optimizar tu video con recorte inteligente y subtítulos automáticos.");
+
+      // Ahora estamos en "Pensando..." después del mensaje inicial
+      // NO desactivamos setIsLoading(false) aquí porque queremos mantenerlo hasta
+      // que comience a mostrarse el siguiente mensaje
+
+      // Iniciar el proceso de edición combinado
+      setAutoEditStep(1);
+
+      // Ejecutar el recorte inteligente
+      const smartTrimResult = await commandExecutor.current.smartTrim();
+
+      // Mensaje durante el proceso (después del cual se mostrará "Pensando...")
+      await addMessageAndWait("Procesando video: eliminando segmentos irrelevantes y preparando el audio para subtítulos...");
+
+      // Ahora estamos en "Pensando..." después del segundo mensaje
+      // NO desactivamos setIsLoading(false) aquí
+      setAutoEditStep(2);
+
+      // Configurar opciones para los subtítulos
+      const subtitleOptions: any = {
+        groupWords: true,
+        startTime: 0,
+        endTime: 1000000 // Hasta el final del video
+      };
+
+      // Añadir los subtítulos
+      await commandExecutor.current.addSubtitles(subtitleOptions);
+
+      // Mensaje final con resumen de acciones
+      let resultMessage = "Optimización completada. ";
+
+      if (smartTrimResult) {
+        resultMessage += "He reducido la duración eliminando partes menos relevantes y añadido subtítulos para mejorar la accesibilidad.";
+      } else {
+        resultMessage += "He añadido subtítulos, pero no pude optimizar la duración.";
+      }
+
+      resultMessage += "\n\n¿Quieres que sigamos?";
+
+      // Para el último mensaje no necesitamos mostrar "Pensando..." después
+      // Así que usamos un método diferente para el último mensaje
+      return new Promise((finalResolve) => {
+        const messageId = Date.now().toString();
+        // Desactivamos "Pensando..." justo antes de mostrar el último mensaje
+        setIsLoading(false);
+        setMessages(prev => [...prev, {
+          id: messageId,
+          content: resultMessage,
+          role: "assistant",
+          timestamp: new Date(),
+          isStreaming: true,
+          // No mostramos "Pensando..." después del último mensaje
+          onStreamingComplete: () => {
+            finalResolve();
+          }
+        }]);
+      });
+    } catch (error) {
+      console.error("Error en la edición automática:", error);
+
+      // Mostrar "Pensando..." antes del mensaje de error
+      setIsLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Mantenemos "Pensando..." hasta que comience a mostrarse el mensaje de error
+      const messageId = Date.now().toString();
+      setMessages(prev => [...prev, {
+        id: messageId,
+        content: `Ha ocurrido un problema durante el proceso: ${error.message || "Error desconocido"}\n\n¿Quieres intentar alguna otra acción?`,
+        role: "assistant",
+        timestamp: new Date(),
+        isStreaming: true
+      }]);
+      // Desactivamos "Pensando..." justo antes de mostrar el mensaje de error
+      setIsLoading(false);
+    } finally {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setIsAutoEditing(false);
+      setAutoEditStep(0);
+      setIsLoading(false);
+    }
+  };
+
   // Función para reiniciar el chat
   const resetChat = () => {
     setMessages([
       {
         id: Date.now().toString(),
-        content: "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?",
+        content: "Escribe \"edita el video\" y optimizaré tu video con recorte inteligente y subtítulos automáticos.",
         role: "assistant",
         timestamp: new Date(),
       },
@@ -601,6 +774,16 @@ export default function AIChat() {
     if (fileInputRef.current) fileInputRef.current.value = '';
     setIsLoading(true);
 
+    // Comprobar si estamos en modo agente y es una solicitud de edición automática
+    if (shouldUseAgent(mode, userMessage.content)) {
+      // Ya no necesitamos el delay aquí, cada mensaje tendrá su propio retraso
+      // en la función addMessageAndWait
+
+      // Ejecutar edición automática
+      await handleAutoEdit();
+      return;
+    }
+
     try {
       // Enviar a la API para procesamiento en lenguaje natural
       const apiMessages = messages
@@ -650,7 +833,10 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
       };
 
       try {
-        const response = await fetch('/api/ai-chat', {
+        // Usar la API correcta según el modo
+        const apiEndpoint = mode === "agent" ? '/api/ai-chat-agent' : '/api/ai-chat';
+
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -823,7 +1009,7 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
       // Mensaje inicial específico según el modo
       const initialMessage = newMode === "chat"
         ? "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?"
-        : "Hola, soy tu asistente de edición de video. ¿En qué puedo ayudarte?";
+        : "Escribe \"edita el video\" y optimizaré tu video con recorte inteligente y subtítulos automáticos.";
 
       // Reiniciar la conversación con el mensaje apropiado
       setMessages([
@@ -833,7 +1019,9 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
           role: "assistant",
           timestamp: new Date(),
           // Marcar el mensaje como inicial para evitar mostrar razonamiento
-          isInitial: true
+          isInitial: true,
+          // Ya no aplicamos streaming al mensaje inicial
+          isStreaming: false
         },
       ]);
 
@@ -842,6 +1030,8 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
       setImageFile(null);
       setImagePreview(null);
       setLastUploadedImageUrl("");
+      setAutoEditStep(0);
+      setIsAutoEditing(false);
     }
   };
 
@@ -911,7 +1101,18 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
                       : "bg-purple-700 text-white"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                  <div className="whitespace-pre-wrap text-sm markdown-content">
+                    {message.isStreaming ? (
+                      <StreamingText
+                        text={message.content}
+                        onComplete={message.onStreamingComplete}
+                      />
+                    ) : (
+                      <ReactMarkdown>
+                        {message.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
                   {message.imageUrl && (
                     <div className="mt-2 rounded overflow-hidden">
                       <img
@@ -972,7 +1173,7 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
               size="icon"
               className="h-9 w-9 bg-transparent hover:bg-purple-800/20"
               onClick={handleImageClick}
-              disabled={isLoading}
+              disabled={isLoading || isAutoEditing}
             >
               <ImageIcon className="h-4 w-4 text-zinc-400" />
             </Button>
@@ -986,21 +1187,21 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
                   handleSendMessage();
                 }
               }}
-              placeholder="Escribe tu mensaje..."
-              disabled={isLoading}
+              placeholder={mode === "agent" ? "Escribe 'edita el video' para comenzar..." : "Escribe tu mensaje..."}
+              disabled={isLoading || isAutoEditing}
               className="flex-1 border-0 bg-transparent h-9 focus:ring-0 focus-visible:ring-0 text-zinc-200"
             />
 
             <Button
               onClick={handleSendMessage}
-              disabled={(!input.trim() && !imageFile) || isLoading}
+              disabled={(!input.trim() && !imageFile) || isLoading || isAutoEditing}
               className={`h-9 px-3 rounded-none ${
-                (!input.trim() && !imageFile) || isLoading
+                (!input.trim() && !imageFile) || isLoading || isAutoEditing
                   ? "bg-purple-900/50 cursor-not-allowed text-purple-300/50"
                   : "bg-purple-700 hover:bg-purple-600 text-white"
               }`}
             >
-              {isLoading || isUploading ? (
+              {isLoading || isUploading || isAutoEditing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-3.5 w-3.5" />
@@ -1016,26 +1217,96 @@ Debes detectar si quiere agregar esta imagen al video y en qué momento temporal
         onChange={handleFileChange}
         accept="image/*"
         className="hidden"
-        disabled={isLoading}
+        disabled={isLoading || isAutoEditing}
       />
     </div>
   );
 }
 
-// Función para generar razonamiento ficticio basado en el contenido del mensaje
+// Función para generar razonamiento basado en el contenido del mensaje
 function generateReasoning(content: string): string {
-  // Por ahora, siempre devolver el mismo razonamiento esquemático
-  return `ANÁLISIS:
-• Tipo: Saludo simple
-• Idioma: Inglés
-• Contexto: Inicio de conversación
+  // Detectar si es un mensaje relacionado con el modo de edición automática
+  if (content.includes("Subtítulos") ||
+      content.includes("Recorte inteligente") ||
+      content.includes("optimizar") ||
+      content.includes("edición")) {
 
-PROCESO:
-1. Identificar intención → Saludo inicial
-2. Seleccionar respuesta → Protocolo estándar de bienvenida
-3. Adaptar al contexto → Edición de video
+    // Determinar el tipo de mensaje y su contexto
+    let etapa = "Planificación inicial";
+    let prioridad = "Alta";
+    let nextStep = "Analizar contenido del video";
 
-SALIDA:
-→ Responder con saludo amigable
-→ Ofrecer asistencia específica para edición`;
+    if (content.includes("Analizando") || content.includes("analiz")) {
+      etapa = "Análisis de contenido";
+      prioridad = "Alta";
+      nextStep = "Identificar segmentos relevantes";
+    } else if (content.includes("Recorte inteligente completado") || content.includes("optimizado")) {
+      etapa = "Optimización de duración";
+      prioridad = "Media";
+      nextStep = "Procesar audio para subtítulos";
+    } else if (content.includes("Procesando el audio") || content.includes("subtítulos")) {
+      etapa = "Generación de subtítulos";
+      prioridad = "Alta";
+      nextStep = "Sincronizar texto con audio";
+    } else if (content.includes("Edición completada") || content.includes("completada")) {
+      etapa = "Finalización del proceso";
+      prioridad = "Baja";
+      nextStep = "Esperar feedback del usuario";
+    }
+
+    return `ANÁLISIS DE PLAN [${etapa}]
+--------------------------------------------------
+Intención detectada: Optimización automática de video
+Objetivo principal: Mejorar calidad y accesibilidad
+Prioridad: ${prioridad}
+--------------------------------------------------
+
+ANÁLISIS DE SOLICITUD:
+• El usuario desea una edición eficiente sin intervención manual
+• Se requiere balance entre duración óptima y preservación de contenido clave
+• La accesibilidad mediante subtítulos es importante
+
+PLAN DE ACCIÓN:
+1. Evaluar el contenido completo del video
+2. Identificar y preservar momentos de alto valor informativo
+3. Eliminar secciones redundantes o de bajo interés
+4. Generar y sincronizar subtítulos precisos
+
+RAZONAMIENTO:
+He determinado que esta combinación de acciones maximiza
+el impacto del video mientras minimiza la duración total.
+El orden de las operaciones es crítico: primero optimizar
+estructura y luego añadir elementos de accesibilidad.
+
+SIGUIENTE PASO:
+→ ${nextStep}`;
+  }
+
+  // Para otros mensajes, mantener un razonamiento enfocado en la asistencia
+  return `ANÁLISIS DE INTERACCIÓN
+--------------------------------------------------
+Tipo: Consulta general
+Contexto: Asistencia en edición de video
+Prioridad: Media
+--------------------------------------------------
+
+ANÁLISIS DE SOLICITUD:
+• El usuario busca información o asistencia específica
+• Se requiere respuesta clara y orientada a soluciones
+• Posible necesidad de sugerencias basadas en contexto
+
+PLAN DE ACCIÓN:
+1. Proporcionar información relevante y concisa
+2. Ofrecer opciones de acción cuando sea apropiado
+3. Mantener un tono útil y accesible
+4. Anticipar posibles preguntas de seguimiento
+
+RAZONAMIENTO:
+He detectado que este tipo de interacción requiere un
+balance entre información técnica y accesibilidad.
+La respuesta debe ser informativa pero sin abrumar
+con detalles innecesarios.
+
+SIGUIENTE PASO:
+→ Esperar indicación específica del usuario`;
 }

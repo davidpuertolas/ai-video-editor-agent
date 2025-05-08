@@ -47,6 +47,73 @@ html, body {
   background: rgba(168, 85, 247, 0.7);
 }
 
+/* Estilos para el contenido Markdown en los mensajes */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  font-weight: 600;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-content h1 {
+  font-size: 1.4em;
+}
+
+.markdown-content h2 {
+  font-size: 1.25em;
+}
+
+.markdown-content h3 {
+  font-size: 1.1em;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.markdown-content em {
+  font-style: italic;
+  color: rgba(199, 210, 254, 0.9);
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+}
+
+.markdown-content li {
+  margin: 0.25em 0;
+}
+
+.markdown-content p {
+  margin: 0.5em 0;
+}
+
+.markdown-content p:first-child {
+  margin-top: 0;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content a {
+  color: rgb(168, 85, 247);
+  text-decoration: underline;
+}
+
 @layer base {
   :root {
     --foreground-rgb: 0, 0, 0;
