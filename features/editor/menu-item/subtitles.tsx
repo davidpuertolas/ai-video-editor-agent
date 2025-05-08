@@ -2,11 +2,13 @@ import Draggable from '@/components/shared/draggable';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DEFAULT_FONT } from '@/features/editor/constants/font';
 import { cn } from '@/lib/utils';
-import { dispatch } from '@designcombo/events';
+import { dispatch, subject, filter } from '@designcombo/events';
 import { ADD_TEXT } from '@designcombo/state';
 import { generateId } from '@designcombo/timeline';
 import { useIsDraggingOverTimeline } from '../hooks/is-dragging-over-timeline';
 import { useEffect, useState } from 'react';
+import useStore from '../store/use-store';
+import { TIMELINE_PREFIX, SELECTION_CREATED, SELECTION_UPDATED } from '@designcombo/timeline';
 
 // Componente Spinner simple
 const Spinner = () => (
@@ -146,6 +148,51 @@ export const Subtitles = () => {
   const [error, setError] = useState<string | null>(null);
   const [addedSubtitles, setAddedSubtitles] = useState<Set<number>>(new Set());
   const [groupWords, setGroupWords] = useState(true); // Estado para controlar si agrupar palabras
+  const { tracks, timeline } = useStore(); // Acceder a los tracks del store
+  const [subtitleTrackId, setSubtitleTrackId] = useState<string | null>(null); // Track ID específico para subtítulos
+  const [statusMessage, setStatusMessage] = useState<string | null>(null); // Mensaje de estado para mostrar al usuario
+
+  // Efecto para escuchar los eventos de selección del timeline
+  useEffect(() => {
+    // Filtrar eventos del timeline
+    const timelineEvents = subject.pipe(
+      filter(({ key }) => key.startsWith(TIMELINE_PREFIX))
+    );
+
+    // Suscribirse a los eventos de selección
+    const subscription = timelineEvents.subscribe((obj) => {
+      // Verificar si es un evento de creación o actualización de selección
+      if ((obj.key === SELECTION_CREATED || obj.key === SELECTION_UPDATED) && obj.value) {
+        console.log('Timeline selection event:', obj.key, obj.value);
+
+        // Intentar obtener los elementos seleccionados
+        const selected = obj.value.selected;
+        if (selected && selected.length > 0) {
+          // Obtener el canvas y los tracks
+          try {
+            const canvas = selected[0].canvas;
+            if (canvas && canvas.tracks && canvas.tracks.length > 0) {
+              // Extraer el ID del primer track
+              const trackId = canvas.tracks[0].id;
+              console.log('Seleccionado track con ID:', trackId);
+
+              // Guardar el ID del track para usar con los subtítulos
+              setSubtitleTrackId(trackId);
+              setStatusMessage(`Track seleccionado para subtítulos (ID: ${trackId.substr(0, 8)}...)`);
+
+              // El mensaje se eliminará después de 3 segundos
+              setTimeout(() => setStatusMessage(null), 3000);
+            }
+          } catch (error) {
+            console.error('Error al procesar selección del timeline:', error);
+          }
+        }
+      }
+    });
+
+    // Limpiar suscripción cuando el componente se desmonte
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchTranscription = async () => {
@@ -185,10 +232,41 @@ export const Subtitles = () => {
     setGroupWords(!groupWords);
   };
 
+  // Función para encontrar o crear un track para subtítulos
+  const getSubtitleTrackId = () => {
+    // Si ya tenemos un ID de track, usarlo
+    if (subtitleTrackId) return subtitleTrackId;
+
+    // Buscar un track de tipo "text" existente
+    let trackId = tracks.find(track => track.type === 'text' && track.accepts.includes('text'))?.id;
+
+    if (trackId) {
+      setSubtitleTrackId(trackId);
+      return trackId;
+    }
+
+    // Si no hay tracks o no se puede obtener timeline, usar un enfoque alternativo
+    if (timeline && timeline.canvas) {
+      // Intentar obtener tracks a través del canvas de timeline
+      const canvasTracks = timeline.canvas.tracks;
+      if (canvasTracks && canvasTracks.length > 0) {
+        trackId = canvasTracks[0].id;
+        setSubtitleTrackId(trackId);
+        return trackId;
+      }
+    }
+
+    // Si no se pudo obtener ningún track, null indicará usar el comportamiento por defecto
+    return null;
+  };
+
   const handleAddSubtitle = (segment: SubtitleSegment) => {
+    // Intentar obtener un track ID para subtítulos
+    const trackId = getSubtitleTrackId();
+
     dispatch(ADD_TEXT, {
       payload: getAddTextPayload(segment.text, segment.startTime, segment.endTime),
-      options: {},
+      options: trackId ? { trackId } : {}, // Solo añadir trackId si existe
     });
 
     // Marcar este subtítulo como añadido
@@ -203,12 +281,16 @@ export const Subtitles = () => {
     // Desactivar el botón mientras se procesan los subtítulos
     setIsLoading(true);
 
+    // Intentar obtener un track ID para subtítulos
+    const trackId = getSubtitleTrackId();
+    console.log(`Usando track ID para subtítulos: ${trackId || 'ninguno (comportamiento por defecto)'}`);
+
     // Añadir subtítulos con un retraso entre cada uno
     subtitleSegments.forEach((segment, index) => {
       setTimeout(() => {
         dispatch(ADD_TEXT, {
           payload: getAddTextPayload(segment.text, segment.startTime, segment.endTime),
-          options: {},
+          options: trackId ? { trackId } : {}, // Solo añadir trackId si existe
         });
 
         // Si es el último subtítulo, actualizar el estado
@@ -217,8 +299,12 @@ export const Subtitles = () => {
           const allIds = new Set(subtitleSegments.map(segment => segment.id));
           setAddedSubtitles(allIds);
           setIsLoading(false);
+          // Mostrar mensaje de finalización
+          setStatusMessage(`Se añadieron ${subtitleSegments.length} subtítulos al track`);
+          // El mensaje se eliminará después de 3 segundos
+          setTimeout(() => setStatusMessage(null), 3000);
         }
-      }, index * 200); // 20ms de retraso entre cada subtítulo
+      }, index * 200); // 200ms de retraso entre cada subtítulo
     });
   };
 
@@ -247,6 +333,23 @@ export const Subtitles = () => {
                 {groupWords ? "Ver subtítulos completos" : "Dividir en grupos de 3 palabras"}
               </div>
             </div>
+
+            {/* Mensaje informativo para el usuario sobre el track seleccionado */}
+            {statusMessage && (
+              <div className="text-green-500 text-sm py-2 mb-2 text-center bg-green-500/10 rounded border border-green-500">
+                {statusMessage}
+              </div>
+            )}
+
+            {/* Información sobre cómo seleccionar un track */}
+            <div className="text-xs text-muted-foreground mb-2 bg-gray-800/50 p-2 rounded">
+              <p>Para añadir todos los subtítulos a un mismo track:</p>
+              <ol className="list-decimal pl-4 mt-1">
+                <li>Selecciona un elemento en la línea de tiempo</li>
+                <li>Luego haz clic en "Añadir todos los subtítulos"</li>
+              </ol>
+            </div>
+
             <div
               onClick={handleAddAllSubtitles}
               className={cn(
@@ -299,7 +402,7 @@ export const Subtitles = () => {
               ))}
             </div>
           </>
-        ) : (
+        ) :
           <Draggable
             data={() => getAddTextPayload("Demo")}
             renderCustomPreview={
@@ -316,7 +419,7 @@ export const Subtitles = () => {
               Add text
             </div>
           </Draggable>
-        )}
+        }
       </div>
     </div>
   );

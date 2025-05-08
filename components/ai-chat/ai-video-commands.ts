@@ -526,8 +526,8 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
 
             return {
               id: segment.id * 1000 + index, // Generar un ID único
-              startTime,
-              endTime,
+              startTime: startTime + 0.01, // Añadir 0.01 segundos al inicio margen no superposicion
+              endTime: endTime - 0.01, // Restar 0.01 segundos al final margen no superposicion
               text: groupText
             };
           });
@@ -564,6 +564,106 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
           },
         });
 
+        // Función para encontrar un track adecuado para subtítulos
+        const getSubtitleTrackId = () => {
+          // Obtener el estado actual
+          const state = stateManager.getState();
+
+          // Inspeccionar el estado completo para depuración
+          console.log("Claves disponibles en el estado:", Object.keys(state));
+
+          // Intentar varias estrategias para encontrar los tracks
+
+          // Estrategia 1: Buscar directamente en state.tracks
+          let tracks = state.tracks || [];
+          if (Array.isArray(tracks) && tracks.length > 0) {
+            console.log(`Encontrados ${tracks.length} tracks en state.tracks`);
+            const textTrack = tracks.find(track => track.type === 'text' && track.accepts && track.accepts.includes('text'));
+            if (textTrack) {
+              console.log(`Encontrado track de texto con ID: ${textTrack.id}`);
+              return textTrack.id;
+            }
+          } else {
+            console.log("No se encontraron tracks en state.tracks");
+          }
+
+          // Estrategia 2: Buscar en la estructura del timeline
+          if (state.timeline) {
+            console.log("Timeline encontrado en el estado");
+
+            // Revisar si hay canvas y tracks en el timeline
+            if (state.timeline.canvas && state.timeline.canvas.tracks) {
+              const canvasTracks = state.timeline.canvas.tracks;
+              if (Array.isArray(canvasTracks) && canvasTracks.length > 0) {
+                console.log(`Encontrados ${canvasTracks.length} tracks en timeline.canvas.tracks`);
+                const trackId = canvasTracks[0].id;
+                console.log(`Usando primer track de canvas: ${trackId}`);
+                return trackId;
+              }
+            }
+
+            // Alternativa: buscar en otras propiedades del timeline
+            if (state.timeline.tracks) {
+              const timelineTracks = state.timeline.tracks;
+              if (Array.isArray(timelineTracks) && timelineTracks.length > 0) {
+                console.log(`Encontrados ${timelineTracks.length} tracks en timeline.tracks`);
+                const trackId = timelineTracks[0].id;
+                console.log(`Usando primer track de timeline.tracks: ${trackId}`);
+                return trackId;
+              }
+            }
+          } else {
+            console.log("No se encontró timeline en el estado");
+          }
+
+          // Estrategia 3: Buscar elementos activos y usar su trackId
+          if (state.activeIds && state.activeIds.length > 0 && state.trackItemsMap) {
+            const activeElement = state.trackItemsMap[state.activeIds[0]];
+            if (activeElement && activeElement.trackId) {
+              console.log(`Usando trackId del elemento activo: ${activeElement.trackId}`);
+              return activeElement.trackId;
+            }
+          }
+
+          // Estrategia 4: Explorar trackItemsMap para encontrar un tipo de track
+          if (state.trackItemsMap && Object.keys(state.trackItemsMap).length > 0) {
+            console.log(`Explorando ${Object.keys(state.trackItemsMap).length} elementos en trackItemsMap`);
+
+            // Buscar un elemento de tipo texto y usar su trackId
+            const textItems = Object.values(state.trackItemsMap)
+              .filter(item => item.type === 'text');
+
+            if (textItems.length > 0) {
+              const trackId = textItems[0].trackId;
+              console.log(`Encontrado trackId ${trackId} de un elemento de texto existente`);
+              return trackId;
+            }
+
+            // Si no hay elementos de texto, usar el primer trackId disponible
+            const firstItem = Object.values(state.trackItemsMap)[0];
+            if (firstItem && firstItem.trackId) {
+              console.log(`Usando primer trackId disponible: ${firstItem.trackId}`);
+              return firstItem.trackId;
+            }
+          }
+
+          // Estrategia 5: Buscar en otras propiedades del estado que podrían contener tracks
+          for (const key of Object.keys(state)) {
+            if (typeof state[key] === 'object' && state[key] !== null) {
+              // Buscar propiedades que parezcan contener tracks
+              if (state[key].tracks && Array.isArray(state[key].tracks) && state[key].tracks.length > 0) {
+                console.log(`Encontrados tracks en state.${key}.tracks`);
+                const trackId = state[key].tracks[0].id;
+                console.log(`Usando track de state.${key}.tracks: ${trackId}`);
+                return trackId;
+              }
+            }
+          }
+
+          console.log("No se encontró ningún track adecuado después de intentar múltiples estrategias");
+          return null;
+        };
+
         // Cargar el archivo SRT
         console.log("Cargando archivo SRT...");
         const response = await fetch('/transcriptions/transcription1.srt');
@@ -595,23 +695,384 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
           console.log(`Filtrado por tiempo: de ${originalLength} a ${segments.length} segmentos`);
         }
 
-        // Añadir los subtítulos con un retraso entre cada uno
-        console.log(`Añadiendo ${segments.length} segmentos de subtítulos al timeline...`);
+        // Obtener el ID del track para subtítulos
+        let trackId = getSubtitleTrackId();
 
-        segments.forEach((segment, index) => {
-          setTimeout(() => {
+        // Enfoque adaptativo: si no hay un track identificado, agregar el primer subtítulo,
+        // obtener su trackId, y luego agregar el resto
+        if (!trackId && segments.length > 0) {
+          console.log("No se identificó un track adecuado. Usando enfoque adaptativo: añadir primer subtítulo y obtener su trackId");
+
+          // Crear una promesa para manejar este proceso asíncrono
+          return new Promise((resolve) => {
+            // Extraer el primer subtítulo
+            const firstSegment = segments[0];
+            const remainingSegments = segments.slice(1);
+
+            console.log("Añadiendo primer subtítulo como elemento inicial para identificar un track...");
+
+            // Añadir el primer subtítulo
             dispatch(ADD_TEXT, {
-              payload: createSubtitlePayload(segment.text, segment.startTime, segment.endTime),
-              options: {},
+              payload: createSubtitlePayload(firstSegment.text, firstSegment.startTime, firstSegment.endTime),
+              options: {}, // Sin trackId específico
             });
 
-            if ((index + 1) % 10 === 0 || index === segments.length - 1) {
-              console.log(`Progreso: ${index + 1}/${segments.length} subtítulos añadidos`);
-            }
-          }, index * 200); // 200ms de retraso entre cada subtítulo
-        });
+            // Esperar 3 segundos para que el elemento se cree y esté disponible en el estado
+            console.log("Esperando 3 segundos para que el primer subtítulo se cree completamente...");
+            setTimeout(() => {
+              // Obtener el estado actualizado
+              const updatedState = stateManager.getState();
 
-        return true;
+              // Buscar elementos de tipo texto recién añadidos
+              let newTrackId = null;
+
+              // Opciones para encontrar el nuevo trackId
+              if (updatedState.trackItemsMap) {
+                const textItems = Object.values(updatedState.trackItemsMap)
+                  .filter(item =>
+                    item.type === 'text' &&
+                    item.details &&
+                    item.details.text === firstSegment.text.toUpperCase()
+                  );
+
+                if (textItems.length > 0) {
+                  newTrackId = textItems[0].trackId;
+                  console.log(`Subtítulo identificado en track: ${newTrackId}`);
+                } else {
+                  // Alternativa: buscar el elemento más reciente
+                  const allItems = Object.values(updatedState.trackItemsMap);
+                  if (allItems.length > 0) {
+                    const mostRecentItem = allItems.sort((a, b) => {
+                      // Ordenar por timestamp de creación si existe, o por rango de tiempo
+                      const aTime = a.timestamp || (a.display ? a.display.from : 0);
+                      const bTime = b.timestamp || (b.display ? b.display.from : 0);
+                      return bTime - aTime; // Orden descendente (más reciente primero)
+                    })[0];
+
+                    newTrackId = mostRecentItem.trackId;
+                    console.log(`Usando track del elemento más reciente: ${newTrackId}`);
+                  }
+                }
+              }
+
+              // Marcar el primer subtítulo como añadido
+              console.log(`Primer subtítulo añadido como referencia. Track identificado: ${newTrackId || 'ninguno'}`);
+
+              // Si no se encontró trackId, intentar con el método original una vez más
+              if (!newTrackId) {
+                newTrackId = getSubtitleTrackId();
+                console.log(`Reintentando obtener trackId: ${newTrackId || 'fallido'}`);
+              }
+
+              // Añadir el resto de los subtítulos con el trackId identificado
+              if (remainingSegments.length > 0) {
+                console.log(`Añadiendo los ${remainingSegments.length} subtítulos restantes${newTrackId ? ` al track ${newTrackId}` : ''}...`);
+
+                // Almacenar los tracks usados para detectar tracks secundarios
+                const usedTracks = new Set<string>();
+                if (newTrackId) usedTracks.add(newTrackId);
+
+                // Mapa para llevar registro de las posiciones y ocupación de tiempo por track
+                const trackTimeMap: Record<string, Array<{from: number, to: number}>> = {};
+
+                // Función para comprobar si un segmento se solapa con los existentes en un track
+                const checkOverlap = (trackId: string, from: number, to: number): boolean => {
+                  if (!trackTimeMap[trackId]) return false; // Si el track no tiene elementos, no hay solapamiento
+
+                  return trackTimeMap[trackId].some(timeSlot => {
+                    // Verificar si hay solapamiento (hay varias formas en que dos intervalos pueden superponerse)
+                    return (from >= timeSlot.from && from < timeSlot.to) || // Inicio dentro de un slot existente
+                           (to > timeSlot.from && to <= timeSlot.to) ||    // Fin dentro de un slot existente
+                           (from <= timeSlot.from && to >= timeSlot.to);   // Abarca completamente un slot existente
+                  });
+                };
+
+                // Función para añadir un registro de tiempo utilizado en un track
+                const addTimeSlot = (trackId: string, from: number, to: number) => {
+                  if (!trackTimeMap[trackId]) {
+                    trackTimeMap[trackId] = [];
+                  }
+                  trackTimeMap[trackId].push({ from, to });
+
+                  // Ordenar para facilitar búsquedas futuras
+                  trackTimeMap[trackId].sort((a, b) => a.from - b.from);
+                };
+
+                // Para monitorear tracks adicionales que se creen
+                const checkForNewTracks = (prevState: any, currentState: any) => {
+                  if (!currentState.trackItemsMap) return null;
+
+                  // Buscar elementos nuevos que no estaban en el estado anterior
+                  const prevItems = prevState.trackItemsMap ? Object.keys(prevState.trackItemsMap) : [];
+                  const currentItems = Object.keys(currentState.trackItemsMap);
+
+                  // Encontrar los IDs de elementos nuevos
+                  const newItemIds = currentItems.filter(id => !prevItems.includes(id));
+
+                  if (newItemIds.length === 0) return null;
+
+                  // Obtener información de los nuevos elementos
+                  const newItems = newItemIds.map(id => currentState.trackItemsMap[id]);
+
+                  // Buscar trackIds que no hayamos visto antes
+                  for (const item of newItems) {
+                    if (item.trackId && !usedTracks.has(item.trackId)) {
+                      console.log(`Detectado nuevo track secundario: ${item.trackId}`);
+                      usedTracks.add(item.trackId);
+                      return item.trackId;
+                    }
+                  }
+
+                  return null;
+                };
+
+                // Procesar los subtítulos restantes con seguimiento de estado
+                let currentState = updatedState;
+                let recentTrackId = newTrackId;
+
+                const processSegmentWithTracking = (index: number) => {
+                  if (index >= remainingSegments.length) {
+                    console.log("Proceso de añadir subtítulos completado con éxito");
+                    resolve(true);
+                    return;
+                  }
+
+                  const segment = remainingSegments[index];
+                  const from = segment.startTime;
+                  const to = segment.endTime;
+
+                  // Comprobar superposición en los tracks disponibles
+                  let selectedTrackId = recentTrackId;
+
+                  // Verificar si hay superposición en el track principal
+                  let hasOverlap = selectedTrackId ? checkOverlap(selectedTrackId, from, to) : false;
+
+                  // Si hay superposición, buscar otro track donde no haya superposición
+                  if (hasOverlap) {
+                    console.log(`Superposición detectada en track ${selectedTrackId} para el segmento ${index+1}`);
+
+                    // Intentar otros tracks que ya conocemos
+                    let foundNonOverlappingTrack = false;
+                    for (const trackId of usedTracks) {
+                      if (trackId !== selectedTrackId && !checkOverlap(trackId, from, to)) {
+                        console.log(`Usando track alternativo ${trackId} para evitar superposición`);
+                        selectedTrackId = trackId;
+                        foundNonOverlappingTrack = true;
+                        break;
+                      }
+                    }
+
+                    // Si no se encontró un track sin superposición, mantener el original
+                    // El sistema podría crear un nuevo track automáticamente
+                    if (!foundNonOverlappingTrack) {
+                      console.log(`No se encontró track alternativo, permitiendo que el sistema cree uno nuevo`);
+                    }
+                  }
+
+                  // Copiar el estado actual antes de la acción
+                  const prevState = { ...currentState };
+
+                  console.log(`Añadiendo subtítulo ${index+1}/${remainingSegments.length} al track ${selectedTrackId || 'automático'}`);
+
+                  // Añadir el subtítulo
+                  dispatch(ADD_TEXT, {
+                    payload: createSubtitlePayload(segment.text, from, to),
+                    options: selectedTrackId ? { trackId: selectedTrackId } : {},
+                  });
+
+                  // Esperar un poco para que se actualice el estado
+                  setTimeout(() => {
+                    // Obtener estado actualizado
+                    currentState = stateManager.getState();
+
+                    // Comprobar si se ha creado un nuevo track
+                    const newTrack = checkForNewTracks(prevState, currentState);
+                    if (newTrack) {
+                      console.log(`El sistema ha creado un nuevo track: ${newTrack}`);
+                      recentTrackId = newTrack;
+
+                      // No necesitamos registrar el tiempo en el track anterior
+                      // ya que el sistema movió el elemento a un nuevo track
+                    } else {
+                      // Registrar el tiempo ocupado en el track utilizado
+                      addTimeSlot(selectedTrackId, from, to);
+                    }
+
+                    // Reportar progreso
+                    if ((index + 1) % 10 === 0 || index === remainingSegments.length - 1) {
+                      console.log(`Progreso: ${index + 1}/${remainingSegments.length} subtítulos adicionales añadidos`);
+                      console.log(`Tracks utilizados hasta ahora: ${Array.from(usedTracks).join(', ')}`);
+                    }
+
+                    // Procesar el siguiente segmento
+                    processSegmentWithTracking(index + 1);
+                  }, 100); // Pequeña espera para que el estado se actualice
+                };
+
+                // Iniciar el procesamiento del primer segmento restante
+                processSegmentWithTracking(0);
+              } else {
+                console.log("No hay subtítulos adicionales para añadir");
+                resolve(true);
+              }
+            }, 100); // Esperar 3 segundos
+          });
+        }
+
+        // Enfoque original si ya tenemos un trackId identificado
+        console.log(`Añadiendo ${segments.length} segmentos de subtítulos al timeline${trackId ? ` en el track ${trackId}` : ''}...`);
+
+        // Crear una promesa para el enfoque tradicional
+        return new Promise((resolve) => {
+          let completedCount = 0;
+
+          // Almacenar los tracks usados para detectar tracks secundarios
+          const usedTracks = new Set<string>();
+          if (trackId) usedTracks.add(trackId);
+
+          // Mapa para llevar registro de las posiciones y ocupación de tiempo por track
+          const trackTimeMap: Record<string, Array<{from: number, to: number}>> = {};
+
+          // Función para comprobar si un segmento se solapa con los existentes en un track
+          const checkOverlap = (trackId: string, from: number, to: number): boolean => {
+            if (!trackTimeMap[trackId]) return false; // Si el track no tiene elementos, no hay solapamiento
+
+            return trackTimeMap[trackId].some(timeSlot => {
+              // Verificar si hay solapamiento
+              return (from >= timeSlot.from && from < timeSlot.to) || // Inicio dentro de un slot existente
+                     (to > timeSlot.from && to <= timeSlot.to) ||    // Fin dentro de un slot existente
+                     (from <= timeSlot.from && to >= timeSlot.to);   // Abarca completamente un slot existente
+            });
+          };
+
+          // Función para añadir un registro de tiempo utilizado en un track
+          const addTimeSlot = (trackId: string, from: number, to: number) => {
+            if (!trackTimeMap[trackId]) {
+              trackTimeMap[trackId] = [];
+            }
+            trackTimeMap[trackId].push({ from, to });
+
+            // Ordenar para facilitar búsquedas futuras
+            trackTimeMap[trackId].sort((a, b) => a.from - b.from);
+          };
+
+          // Para monitorear tracks adicionales que se creen
+          const checkForNewTracks = (prevState: any, currentState: any) => {
+            if (!currentState.trackItemsMap) return null;
+
+            // Buscar elementos nuevos que no estaban en el estado anterior
+            const prevItems = prevState.trackItemsMap ? Object.keys(prevState.trackItemsMap) : [];
+            const currentItems = Object.keys(currentState.trackItemsMap);
+
+            // Encontrar los IDs de elementos nuevos
+            const newItemIds = currentItems.filter(id => !prevItems.includes(id));
+
+            if (newItemIds.length === 0) return null;
+
+            // Obtener información de los nuevos elementos
+            const newItems = newItemIds.map(id => currentState.trackItemsMap[id]);
+
+            // Buscar trackIds que no hayamos visto antes
+            for (const item of newItems) {
+              if (item.trackId && !usedTracks.has(item.trackId)) {
+                console.log(`Detectado nuevo track secundario: ${item.trackId}`);
+                usedTracks.add(item.trackId);
+                return item.trackId;
+              }
+            }
+
+            return null;
+          };
+
+          // Procesar los subtítulos con seguimiento de estado
+          let currentState = stateManager.getState();
+          let recentTrackId = trackId;
+
+          const processSegmentWithTracking = (index: number) => {
+            if (index >= segments.length) {
+              console.log("Proceso de añadir subtítulos completado con éxito");
+              console.log(`Tracks utilizados: ${Array.from(usedTracks).join(', ')}`);
+              resolve(true);
+              return;
+            }
+
+            const segment = segments[index];
+            const from = segment.startTime;
+            const to = segment.endTime;
+
+            // Comprobar superposición en los tracks disponibles
+            let selectedTrackId = recentTrackId;
+
+            // Verificar si hay superposición en el track principal
+            let hasOverlap = selectedTrackId ? checkOverlap(selectedTrackId, from, to) : false;
+
+            // Si hay superposición, buscar otro track donde no haya superposición
+            if (hasOverlap) {
+              console.log(`Superposición detectada en track ${selectedTrackId} para el segmento ${index+1}`);
+
+              // Intentar otros tracks que ya conocemos
+              let foundNonOverlappingTrack = false;
+              for (const trackId of usedTracks) {
+                if (trackId !== selectedTrackId && !checkOverlap(trackId, from, to)) {
+                  console.log(`Usando track alternativo ${trackId} para evitar superposición`);
+                  selectedTrackId = trackId;
+                  foundNonOverlappingTrack = true;
+                  break;
+                }
+              }
+
+              // Si no se encontró un track sin superposición, mantener el original
+              // El sistema podría crear un nuevo track automáticamente
+              if (!foundNonOverlappingTrack) {
+                console.log(`No se encontró track alternativo, permitiendo que el sistema cree uno nuevo`);
+              }
+            }
+
+            // Copiar el estado actual antes de la acción
+            const prevState = { ...currentState };
+
+            console.log(`Añadiendo subtítulo ${index+1}/${segments.length} al track ${selectedTrackId || 'automático'}`);
+
+            // Añadir el subtítulo
+            dispatch(ADD_TEXT, {
+              payload: createSubtitlePayload(segment.text, from, to),
+              options: selectedTrackId ? { trackId: selectedTrackId } : {},
+            });
+
+            // Esperar un poco para que se actualice el estado
+            setTimeout(() => {
+              // Obtener estado actualizado
+              currentState = stateManager.getState();
+
+              // Comprobar si se ha creado un nuevo track
+              const newTrack = checkForNewTracks(prevState, currentState);
+              if (newTrack) {
+                console.log(`El sistema ha creado un nuevo track: ${newTrack}`);
+                recentTrackId = newTrack;
+
+                // No necesitamos registrar el tiempo en el track anterior
+                // ya que el sistema movió el elemento a un nuevo track
+              } else {
+                // Registrar el tiempo ocupado en el track utilizado
+                if (selectedTrackId) {
+                  addTimeSlot(selectedTrackId, from, to);
+                }
+              }
+
+              // Reportar progreso
+              completedCount++;
+              if (completedCount % 10 === 0 || completedCount === segments.length) {
+                console.log(`Progreso: ${completedCount}/${segments.length} subtítulos añadidos`);
+              }
+
+              // Procesar el siguiente segmento
+              processSegmentWithTracking(index + 1);
+            }, 100); // Pequeña espera para que el estado se actualice
+          };
+
+          // Iniciar el procesamiento del primer segmento
+          processSegmentWithTracking(0);
+        });
       } catch (error) {
         console.error("Error al añadir subtítulos:", error);
         return false;

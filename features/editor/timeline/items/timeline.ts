@@ -59,7 +59,7 @@ class Timeline extends TimelineBase {
     // Monitor selection changes
     if (this.on) {
       this.on('selection:created', (e: any) => {
-        console.log('Timeline - Selection created event:', e);
+        console.log('Timeline - Selection created event:', e); 
 
         // Check if this is a mouseup event (selection by drag)
         if (e.e && e.e.type === 'mouseup' && e.selected && e.selected.length > 0) {
