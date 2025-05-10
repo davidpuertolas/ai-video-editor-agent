@@ -420,7 +420,11 @@ const SelectionModal: React.FC = () => {
                 // Añadir la imagen a la timeline
                 await commandExecutor.addImage(firstScreenshot.screenshotPath, {
                   startTime,
-                  endTime
+                  endTime,
+                  position: { x: 0, y: 0.5 }, // centrado
+                  width: 2400, // Usar un tamaño base más grande
+                  height: 1800, // Usar un tamaño base más grande
+                  scaleMode: "fit" // Asegurar que la imagen se ajuste correctamente
                 });
 
                 // Registrar la captura añadida
@@ -589,7 +593,10 @@ const SelectionModal: React.FC = () => {
         startTime,
         endTime: startTime + 5, // 5 segundos de duración por defecto
         position: { x: 0.5, y: 0.5 }, // centrado
-        isStatic: isAPNG // Si es APNG, forzar como estático
+        isStatic: isAPNG, // Si es APNG, forzar como estático
+        width: 800, // Usar un tamaño base más grande
+        height: 600, // Usar un tamaño base más grande
+        scaleMode: "fit" // Asegurar que la imagen se ajuste correctamente manteniendo su relación de aspecto
       });
 
       // Actualizar la UI con el éxito
@@ -874,10 +881,13 @@ const SelectionModal: React.FC = () => {
                   src={lastActionInfo.screenshotToAdd}
                   alt="Captura de pantalla"
                   style={{
-                    width: '100%',
+                    width: '140%',
+                    maxWidth: '600px',
+                    marginLeft: '-20%',
                     borderRadius: '4px',
                     marginBottom: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
                   }}
                 />
                     <div style={{

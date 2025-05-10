@@ -199,7 +199,7 @@ export const Subtitles = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/transcriptions/transcription1.srt');
+        const response = await fetch('/transcriptions/transcriptionSubtitles.srt');
         if (!response.ok) {
           throw new Error(`Error al cargar el archivo SRT: ${response.status}`);
         }

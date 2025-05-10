@@ -268,10 +268,17 @@ const processDetectedElement = async (elementData, commandExecutor, finalRespons
           subtitleOptions.endTime = element.endTime;
         }
 
-        // Añadir los subtítulos
-        commandExecutor.current.addSubtitles(subtitleOptions);
+        // Añadir los subtítulos desde el archivo específico
+        console.log("Usando subtítulos desde public/transcriptions/transcriptionSubtitles.srt");
+        const result = await commandExecutor.current.addSubtitles(subtitleOptions);
 
-        // Actualizar respuesta silenciosa (se maneja en otro lado)
+        // Actualizar respuesta con información específica sobre el origen de los subtítulos
+        finalResponse += `\n\n[He agregado los subtítulos desde el archivo transcriptionSubtitles.srt${
+          typeof element.startTime === 'number' && typeof element.endTime === 'number'
+            ? ` entre los segundos ${element.startTime} y ${element.endTime}`
+            : ""
+        }]`;
+
         elementAdded = true;
       }
       else if (element.type === "segments" && Array.isArray(element.segments) && element.segments.length > 0) {

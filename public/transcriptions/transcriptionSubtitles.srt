@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:07,500
+In today's video, I'm gonna be talking about YC and why it is the best startup accelerator in 2025.
+
+2
+00:00:07,501 --> 00:00:14,150
+YC has been around since 2005, setting the bar high for launching startups.
+
+3
+00:00:14,151 --> 00:00:22,100
+They have backed startups like Airbnb, Reddit, OpenAI, yeahhh, those.
+
+4
+00:00:22,101 --> 00:00:25,090
+So what makes YC special?
+
+5
+00:00:25,091 --> 00:00:28,680
+1. Mentorship from real founders.
+
+6
+00:00:28,681 --> 00:00:33,981
+2. The $500,000 upfront
+
+7
+00:00:33,982 --> 00:00:39,782
+3. The networking. Thousands of founders trying to help each other.
+
+8
+00:00:39,783 --> 00:00:47,920
+I first discovered YC in 2022, and since that day, my perception about building startups has completely changed.
+
+9
+00:00:47,921 --> 00:01:03,949
+Now, I'm even applying with my own startup, Wands. It's an AI-powered video editing agent, which means that can edit the video for you. You send the video, it's gonna be edited in like one, two minutes, no more.
+
+10
+00:01:03,950 --> 00:01:10,266
+If you're building something like me, check out ycombinator.com. See you in SF.

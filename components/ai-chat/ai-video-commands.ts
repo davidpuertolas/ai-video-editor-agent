@@ -444,7 +444,7 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
 
     addSubtitles: async (options?: SubtitleOptions) => {
       try {
-        console.log("Añadiendo subtítulos directamente sin depender del botón");
+        console.log("Añadiendo subtítulos desde el archivo transcriptionSubtitles.srt");
 
         // Tipo para representar un segmento de subtítulo
         interface SubtitleSegment {
@@ -493,14 +493,29 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
           return segments;
         };
 
-        // Función para dividir un texto en grupos de aproximadamente 3 palabras
-        const splitTextIntoGroups = (text: string, wordsPerGroup = 3): string[] => {
+        // Función para dividir un texto en grupos de aproximadamente 17 caracteres máximo
+        const splitTextIntoGroups = (text: string): string[] => {
           const words = text.split(/\s+/);
           const groups: string[] = [];
+          let currentGroup = '';
 
-          for (let i = 0; i < words.length; i += wordsPerGroup) {
-            const group = words.slice(i, i + wordsPerGroup).join(' ');
-            groups.push(group);
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+
+            // Si añadir esta palabra excedería los 17 caracteres y ya hay algo en el grupo actual
+            if ((currentGroup.length + word.length + 1) > 17 && currentGroup.length > 0) {
+              // Guardar el grupo actual y empezar uno nuevo
+              groups.push(currentGroup);
+              currentGroup = word;
+            } else {
+              // Añadir la palabra al grupo actual (con espacio si no está vacío)
+              currentGroup = currentGroup.length > 0 ? `${currentGroup} ${word}` : word;
+            }
+          }
+
+          // Añadir el último grupo si contiene algo
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
           }
 
           return groups;
@@ -561,6 +576,12 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
             backgroundColor: 'transparent', // Sin fondo para que destaque más
             padding: 10,
             borderRadius: 0, // Sin bordes redondeados para un estilo más impactante
+            // Posición vertical más baja (0.85 representa 85% desde la parte superior)
+            top: 900,
+            // Centrado horizontal
+            left: 0,
+            // Propiedades adicionales para asegurar posicionamiento correcto
+            position: 'absolute',
           },
         });
 
@@ -665,8 +686,9 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
         };
 
         // Cargar el archivo SRT
-        console.log("Cargando archivo SRT...");
-        const response = await fetch('/transcriptions/transcription1.srt');
+        // La ruta específica para el archivo de subtítulos requerido
+        console.log("Cargando archivo SRT desde public/transcriptions/transcriptionSubtitles.srt...");
+        const response = await fetch('/transcriptions/transcriptionSubtitles.srt');
         if (!response.ok) {
           throw new Error(`Error al cargar el archivo SRT: ${response.status}`);
         }
@@ -877,7 +899,10 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
                   // Añadir el subtítulo
                   dispatch(ADD_TEXT, {
                     payload: createSubtitlePayload(segment.text, from, to),
-                    options: selectedTrackId ? { trackId: selectedTrackId } : {},
+                    options: {
+                      trackId: selectedTrackId || undefined,
+                      position: { x: 0.5, y: 0.85 }, // Posicionar en la parte inferior de la pantalla
+                    },
                   });
 
                   // Esperar un poco para que se actualice el estado
@@ -1036,7 +1061,10 @@ export function createVideoCommandExecutor(stateManager: StateManager): VideoCom
             // Añadir el subtítulo
             dispatch(ADD_TEXT, {
               payload: createSubtitlePayload(segment.text, from, to),
-              options: selectedTrackId ? { trackId: selectedTrackId } : {},
+              options: {
+                trackId: selectedTrackId || undefined,
+                position: { x: 0.5, y: 0.85 }, // Posicionar en la parte inferior de la pantalla
+              },
             });
 
             // Esperar un poco para que se actualice el estado

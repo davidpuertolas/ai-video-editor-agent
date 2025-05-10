@@ -2,7 +2,7 @@ import Draggable from "@/components/shared/draggable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VIDEOS } from "../data/video";
 import { dispatch } from "@designcombo/events";
-import { ADD_VIDEO } from "@designcombo/state";
+import { ADD_VIDEO, DESIGN_RESIZE } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 import { IVideo } from "@designcombo/types";
 import React, { useState, useRef } from "react";
@@ -20,13 +20,65 @@ export const Videos = () => {
     console.log("[DEBUG Videos] Thumbnail disponible:", !!payload.metadata?.previewUrl);
     console.log("[DEBUG Videos] Nombre del archivo:", payload.metadata?.fileName || "No disponible");
 
-    dispatch(ADD_VIDEO, {
-      payload,
-      options: {
-        resourceId: "main",
-        scaleMode: "fit",
-      },
-    });
+    // Crear un elemento de video temporal para obtener las dimensiones
+    const videoElement = document.createElement('video');
+    videoElement.preload = 'metadata';
+
+    videoElement.onloadedmetadata = () => {
+      const videoWidth = videoElement.videoWidth;
+      const videoHeight = videoElement.videoHeight;
+      console.log("[DEBUG Videos] Dimensiones del video:", videoWidth, "x", videoHeight);
+
+      // Determinar si es horizontal o vertical
+      const isHorizontal = videoWidth > videoHeight;
+
+      // Configurar el tamaño del canvas según la orientación
+      if (isHorizontal) {
+        // Si es horizontal, usar 16:9
+        dispatch(DESIGN_RESIZE, {
+          payload: {
+            width: 1920,
+            height: 1080,
+            name: "16:9",
+          },
+        });
+        console.log('[DEBUG Videos] Video horizontal detectado. Configurando canvas a 16:9');
+      } else {
+        // Si es vertical, usar 9:16
+        dispatch(DESIGN_RESIZE, {
+          payload: {
+            width: 1080,
+            height: 1920,
+            name: "9:16",
+          },
+        });
+        console.log('[DEBUG Videos] Video vertical detectado. Configurando canvas a 9:16');
+      }
+
+      // Después de configurar el tamaño, agregamos el video al editor
+      dispatch(ADD_VIDEO, {
+        payload,
+        options: {
+          resourceId: "main",
+          scaleMode: "fit",
+        },
+      });
+    };
+
+    videoElement.onerror = (error) => {
+      console.error("[ERROR Videos] Error cargando video para determinar dimensiones:", error);
+      // Si hay error, agregar el video de todos modos con la configuración predeterminada
+      dispatch(ADD_VIDEO, {
+        payload,
+        options: {
+          resourceId: "main",
+          scaleMode: "fit",
+        },
+      });
+    };
+
+    // Establecer la fuente del video
+    videoElement.src = payload.details?.src || '';
   };
 
   // Función para generar una miniatura a partir de un video
@@ -235,7 +287,9 @@ const VideoItem = ({
             metadata: {
               previewUrl: video.preview,
             },
-          } as any)
+            type: video.type,
+            duration: video.duration,
+          })
         }
         className="flex w-full items-center justify-center overflow-hidden bg-background pb-2"
       >
