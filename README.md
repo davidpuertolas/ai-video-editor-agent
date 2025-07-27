@@ -1,6 +1,6 @@
 <div align="center">
   <img height="256" alt="Wands Preview" src="https://github.com/user-attachments/assets/ae939d12-9c18-4ea8-ab32-fbe67fbb6063" />
-  <h1>Wands — AI Video Editor Agent (Demo)</h1>
+  <h1>AI Video Editor Agent (Public Version)</h1>
   <p>Natural language–driven editing. No timeline. No drag & drop. Just prompts.</p>
 </div>
 
