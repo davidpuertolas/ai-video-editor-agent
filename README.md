@@ -72,7 +72,7 @@ Wands is building a future where creators describe the edit — and the agent do
 
 ## License
 
-MIT
+[![license](https://img.shields.io/github/license/yc-video-editor-agent)](./LICENSE)
 
 ---
 
