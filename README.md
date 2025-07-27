@@ -17,7 +17,7 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/wands-demo.git
+git clone https://github.com/YOUR_USERNAME/yc-video-editor-agent.git
 cd wands-demo
 npm install
 npm run dev
@@ -36,7 +36,7 @@ npm run dev
 
 ## Demo Scope
 
-This is an public demo of Wands — it does **not include** the autonomous AI agent yet.  
+This is an public demo of Wands — it does **not include** the autonomous AI agent (that is private😜).  
 Instead, it simulates how a user would interact with Wands through prompts, offering a preview of the experience:
 
 Chat Mode:
