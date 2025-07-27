@@ -28,23 +28,25 @@ npm run dev
 ## Features
 
 - ✂️ Trim & cut via prompts  
-- 📝 Add text overlays & subtitles  
-- 🎵 Add music, transitions, and effects  
-- ⚡ Simulated AI-agent experience (no real agent yet)
+- 📝 Add text overlays & subtitles via prompts 
+- 🎵 Add music, transitions, and effects via prompts
+- ⚡ Simulated AI-agent experience (no real agent in public version)
 
 ---
 
 ## Demo Scope
 
-This is an early demo of Wands — it does **not include** the autonomous AI agent yet.  
+This is an public demo of Wands — it does **not include** the autonomous AI agent yet.  
 Instead, it simulates how a user would interact with Wands through prompts, offering a preview of the experience:
 
-> “Zoom in at 0:15, add subtitles, and background music” → Result in seconds.
+Chat Mode:
+> “At 0:15, add subtitles, and background music” → Result in seconds.
+> “At 0:15, add text "HELLO" in red” → Result in seconds.
+> “At 0:15, add background music” → Result in seconds.
 
-The goal is to validate:
-- The interaction model (prompt → edit)
-- UX design for AI-first editing
-- Value for creators stuck in manual workflows
+Agent Mode:
+> “At 0:15, add subtitles, text "HELLO" in red and background music” → Result in seconds, by simulation due to public version restrictions.
+
 
 ---
 
@@ -62,9 +64,9 @@ Wands is building a future where creators describe the edit — and the agent do
 
 ## Tech Stack
 
-- **Frontend**: React, Next.js, Tailwind CSS, Framer Motion  
-- **Media**: FFmpeg (for future versions)  
-- **Infra (planned)**: AI agents with multimodal planning + local rendering pipelines
+- **Frontend**: React, Next.js, Tailwind CSS, Framer Motion...  
+- **Media**: FFmpeg + private logic
+- **Infra (private)**: AI agents with multimodal planning + local rendering pipelines
 
 ---
 
@@ -76,5 +78,5 @@ MIT
 
 ## Author
 
-Built by [David Puértolas](https://tubelabs.ai)  
+Built by [David Puértolas](https://www.linkedin.com/in/david-puertolas-merenciano/)  
 [Instagram – @tubelabs.ai](https://www.instagram.com/tubelabs.ai/)
