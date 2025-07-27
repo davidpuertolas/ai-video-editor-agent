@@ -40,8 +40,8 @@ This is an public demo of Wands — it does **not include** the autonomous AI ag
 Instead, it simulates how a user would interact with Wands through prompts, offering a preview of the experience:
 
 Chat Mode (real implementation):
-> “At 0:15, add subtitles, and background music” → Result in seconds.\n
-> “At 0:15, add text "HELLO" in red” → Result in seconds.\n
+> “At 0:15, add subtitles, and background music” → Result in seconds.
+> “At 0:15, add text "HELLO" in red” → Result in seconds.
 > “At 0:15, add background music” → Result in seconds.
 
 Agent Mode (implementation by sequential chat mode assignments):
