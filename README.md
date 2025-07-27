@@ -39,12 +39,12 @@ npm run dev
 This is an public demo of Wands — it does **not include** the autonomous AI agent (that is private😜).  
 Instead, it simulates how a user would interact with Wands through prompts, offering a preview of the experience:
 
-Chat Mode:
-> “At 0:15, add subtitles, and background music” → Result in seconds.
-> “At 0:15, add text "HELLO" in red” → Result in seconds.
+Chat Mode (real implementation):
+> “At 0:15, add subtitles, and background music” → Result in seconds.\n
+> “At 0:15, add text "HELLO" in red” → Result in seconds.\n
 > “At 0:15, add background music” → Result in seconds.
 
-Agent Mode:
+Agent Mode (implementation by sequential chat mode assignments):
 > “At 0:15, add subtitles, text "HELLO" in red and background music” → Result in seconds, by simulation due to public version restrictions.
 
 
