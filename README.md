@@ -18,7 +18,7 @@
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/yc-video-editor-agent.git
-cd wands-demo
+cd yc-video-editor-agent
 npm install
 npm run dev
 ```
